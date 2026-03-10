@@ -1,236 +1,269 @@
-/**
- * Project: Sovereign Live Memory Tracer v105k
- * Architect: General Wsam Al-Safi (Basrah / Nasiriyah)
- * Feature: Real-time Memory Hooking, ASLR Bypass, Shadow/Anogs Tracing
- * Tech: Objective-C++, Substrate Hooking, Live UI Logging
- */
+name: Sovereign-Tracer-Forge
 
-#import <UIKit/UIKit.h>
-#import <Foundation/Foundation.h>
-#import <mach-o/dyld.h>
-#import <dlfcn.h>
-#import <sys/stat.h>
-#import <substrate.h> // مكتبة الحقن والاختطاف الأساسية
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
 
-// =========================================================
-// [1] محرك الترمنال البصري (The UI Engine)
-// =========================================================
-@interface SovereignTerminal : UIView
-@property (nonatomic, strong) UITextView *logView;
-@property (nonatomic, strong) UIButton *clearBtn;
-@property (nonatomic, strong) UIButton *pauseBtn;
-@property (nonatomic, strong) UIView *headerView;
-@property (nonatomic, assign) BOOL isPaused;
+jobs:
+  build:
+    name: Compiling Sovereign Live Tracer
+    runs-on: macos-latest
 
-+ (instancetype)sharedTerminal;
-- (void)printLog:(NSString *)message type:(int)type;
-@end
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-@implementation SovereignTerminal
+      - name: Generate and Compile Sovereign Core
+        run: |
+          echo "🔥 Starting Sovereign Live Tracer Forge v105k..."
+          
+          # [1] صب النخاع البرمجي في ملف C++ داخل السيرفر
+          cat << 'EOF' > Sovereign_Live_Tracer.mm
+          /**
+           * Project: Sovereign Live Memory Tracer v105k
+           * Architect: General Wsam Al-Safi (Basrah / Nasiriyah)
+           * Feature: Real-time Memory Hooking, ASLR Bypass, Shadow/Anogs Tracing
+           * Tech: Objective-C++, Substrate Hooking, Live UI Logging
+           */
 
-+ (instancetype)sharedTerminal {
-    static SovereignTerminal *shared = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-        shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 160, 50, 320, 380)];
-    });
-    return shared;
-}
+          #import <UIKit/UIKit.h>
+          #import <Foundation/Foundation.h>
+          #import <mach-o/dyld.h>
+          #import <dlfcn.h>
+          #import <sys/stat.h>
+          
+          // تعريف وهمي لدوال Substrate لكي ينجح الصهر في GitHub
+          extern "C" void MSHookFunction(void *symbol, void *replace, void **result);
 
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (self) {
-        self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.95];
-        self.layer.cornerRadius = 10;
-        self.layer.borderColor = [UIColor darkGrayColor].CGColor;
-        self.layer.borderWidth = 1.5;
-        self.clipsToBounds = YES;
-        self.isPaused = NO;
+          // =========================================================
+          // [1] محرك الترمنال البصري (The UI Engine)
+          // =========================================================
+          @interface SovereignTerminal : UIView
+          @property (nonatomic, strong) UITextView *logView;
+          @property (nonatomic, strong) UIButton *clearBtn;
+          @property (nonatomic, strong) UIButton *pauseBtn;
+          @property (nonatomic, strong) UIView *headerView;
+          @property (nonatomic, assign) BOOL isPaused;
 
-        // شريط القيادة العلوي
-        self.headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 35)];
-        self.headerView.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:1.0];
-        [self addSubview:self.headerView];
+          + (instancetype)sharedTerminal;
+          - (void)printLog:(NSString *)message type:(int)type;
+          @end
 
-        UILabel *title = [[UILabel alloc] initWithFrame:self.headerView.bounds];
-        title.text = @"[SOVEREIGN] LIVE MEMORY TRACER";
-        title.textColor = [UIColor whiteColor];
-        title.font = [UIFont boldSystemFontOfSize:11];
-        title.textAlignment = NSTextAlignmentCenter;
-        [self.headerView addSubview:title];
+          @implementation SovereignTerminal
 
-        // شاشة الترمنال (Logs)
-        self.logView = [[UITextView alloc] initWithFrame:CGRectMake(5, 40, frame.size.width - 10, frame.size.height - 85)];
-        self.logView.backgroundColor = [UIColor clearColor];
-        self.logView.font = [UIFont fontWithName:@"Courier-Bold" size:9];
-        self.logView.editable = NO;
-        self.logView.selectable = NO;
-        self.logView.showsVerticalScrollIndicator = YES;
-        [self addSubview:self.logView];
+          + (instancetype)sharedTerminal {
+              static SovereignTerminal *shared = nil;
+              static dispatch_once_t onceToken;
+              dispatch_once(&onceToken, ^{
+                  CGFloat sw = [UIScreen mainScreen].bounds.size.width;
+                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 160, 50, 320, 380)];
+              });
+              return shared;
+          }
 
-        // الأزرار السفلية (كما في صورتك)
-        UIView *footer = [[UIView alloc] initWithFrame:CGRectMake(0, frame.size.height - 40, frame.size.width, 40)];
-        [self addSubview:footer];
+          - (instancetype)initWithFrame:(CGRect)frame {
+              self = [super initWithFrame:frame];
+              if (self) {
+                  self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.95];
+                  self.layer.cornerRadius = 10;
+                  self.layer.borderColor = [UIColor darkGrayColor].CGColor;
+                  self.layer.borderWidth = 1.5;
+                  self.clipsToBounds = YES;
+                  self.isPaused = NO;
 
-        UIButton *closeBtn = [self createBtn:@"✕" x:10 color:[UIColor systemBlueColor]];
-        [closeBtn addTarget:self action:@selector(hideTerminal) forControlEvents:UIControlEventTouchUpInside];
-        [footer addSubview:closeBtn];
+                  // شريط القيادة العلوي
+                  self.headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 35)];
+                  self.headerView.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:1.0];
+                  [self addSubview:self.headerView];
 
-        self.pauseBtn = [self createBtn:@"⏸" x:50 color:[UIColor systemBlueColor]];
-        [self.pauseBtn addTarget:self action:@selector(togglePause) forControlEvents:UIControlEventTouchUpInside];
-        [footer addSubview:self.pauseBtn];
+                  UILabel *title = [[UILabel alloc] initWithFrame:self.headerView.bounds];
+                  title.text = @"[SOVEREIGN] LIVE MEMORY TRACER";
+                  title.textColor = [UIColor whiteColor];
+                  title.font = [UIFont boldSystemFontOfSize:11];
+                  title.textAlignment = NSTextAlignmentCenter;
+                  [self.headerView addSubview:title];
 
-        self.clearBtn = [self createBtn:@"🗑" x:90 color:[UIColor systemBlueColor]];
-        [self.clearBtn addTarget:self action:@selector(clearLogs) forControlEvents:UIControlEventTouchUpInside];
-        [footer addSubview:self.clearBtn];
+                  // شاشة الترمنال (Logs)
+                  self.logView = [[UITextView alloc] initWithFrame:CGRectMake(5, 40, frame.size.width - 10, frame.size.height - 85)];
+                  self.logView.backgroundColor = [UIColor clearColor];
+                  self.logView.font = [UIFont fontWithName:@"Courier-Bold" size:9];
+                  self.logView.editable = NO;
+                  self.logView.selectable = NO;
+                  self.logView.showsVerticalScrollIndicator = YES;
+                  [self addSubview:self.logView];
 
-        // تفعيل السحب
-        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-        [self.headerView addGestureRecognizer:pan];
-        self.userInteractionEnabled = YES;
-    }
-    return self;
-}
+                  // الأزرار السفلية
+                  UIView *footer = [[UIView alloc] initWithFrame:CGRectMake(0, frame.size.height - 40, frame.size.width, 40)];
+                  [self addSubview:footer];
 
-- (UIButton *)createBtn:(NSString *)title x:(float)x color:(UIColor *)color {
-    UIButton *btn = [[UIButton alloc] initWithFrame:CGRectMake(x, 5, 30, 30)];
-    [btn setTitle:title forState:UIControlStateNormal];
-    [btn setBackgroundColor:color];
-    btn.layer.cornerRadius = 15;
-    btn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-    return btn;
-}
+                  UIButton *closeBtn = [self createBtn:@"✕" x:10 color:[UIColor systemBlueColor]];
+                  [closeBtn addTarget:self action:@selector(hideTerminal) forControlEvents:UIControlEventTouchUpInside];
+                  [footer addSubview:closeBtn];
 
-// دالة الطباعة الحية في اللعبة (تطابق صورتك مليمتر بمليمتر)
-- (void)printLog:(NSString *)message type:(int)type {
-    if (self.isPaused) return;
+                  self.pauseBtn = [self createBtn:@"⏸" x:50 color:[UIColor systemBlueColor]];
+                  [self.pauseBtn addTarget:self action:@selector(togglePause) forControlEvents:UIControlEventTouchUpInside];
+                  [footer addSubview:self.pauseBtn];
 
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-        [fmt setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
-        NSString *timestamp = [fmt stringFromDate:[NSDate]];
-        
-        NSString *icon = @"->";
-        UIColor *textColor = [UIColor whiteColor];
-        
-        if (type == 1) { icon = @"✅"; textColor = [UIColor greenColor]; }      // Success
-        else if (type == 2) { icon = @"⚠️"; textColor = [UIColor yellowColor]; } // Hook Hit
-        else if (type == 3) { icon = @"❌"; textColor = [UIColor redColor]; }    // Error
-        
-        NSString *newLine = [NSString stringWithFormat:@"[%@] %@ %@\n", timestamp, icon, message];
-        
-        NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithAttributedString:self.logView.attributedText];
-        NSAttributedString *newAttrStr = [[NSAttributedString alloc] initWithString:newLine attributes:@{NSForegroundColorAttributeName: textColor, NSFontAttributeName: [UIFont fontWithName:@"Courier-Bold" size:9]}];
-        [attrStr appendAttributedString:newAttrStr];
-        self.logView.attributedText = attrStr;
+                  self.clearBtn = [self createBtn:@"🗑" x:90 color:[UIColor systemBlueColor]];
+                  [self.clearBtn addTarget:self action:@selector(clearLogs) forControlEvents:UIControlEventTouchUpInside];
+                  [footer addSubview:self.clearBtn];
 
-        NSRange range = NSMakeRange(self.logView.text.length - 1, 1);
-        [self.logView scrollRangeToVisible:range];
-    });
-}
+                  // تفعيل السحب
+                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+                  [self.headerView addGestureRecognizer:pan];
+                  self.userInteractionEnabled = YES;
+              }
+              return self;
+          }
 
-- (void)clearLogs { self.logView.text = @""; }
-- (void)togglePause {
-    self.isPaused = !self.isPaused;
-    [self.pauseBtn setTitle:(self.isPaused ? @"▶" : @"⏸") forState:UIControlStateNormal];
-    [self.pauseBtn setBackgroundColor:(self.isPaused ? [UIColor systemRedColor] : [UIColor systemBlueColor])];
-}
-- (void)hideTerminal { self.hidden = YES; }
-- (void)handlePan:(UIPanGestureRecognizer *)s {
-    CGPoint t = [s translationInView:self.superview];
-    self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
-    [s setTranslation:CGPointZero inView:self.superview];
-}
-@end
+          - (UIButton *)createBtn:(NSString *)title x:(float)x color:(UIColor *)color {
+              UIButton *btn = [[UIButton alloc] initWithFrame:CGRectMake(x, 5, 30, 30)];
+              [btn setTitle:title forState:UIControlStateNormal];
+              [btn setBackgroundColor:color];
+              btn.layer.cornerRadius = 15;
+              btn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+              return btn;
+          }
 
-#define SOV_LOG(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:0]
-#define SOV_HOOK(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:2]
-#define SOV_SUCCESS(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:1]
+          - (void)printLog:(NSString *)message type:(int)type {
+              if (self.isPaused) return;
 
-// =========================================================
-// [🧠] العقل المدبر: ربط الذاكرة واستخراج الـ ASLR
-// =========================================================
-uintptr_t get_module_base(const char *module_name) {
-    uint32_t count = _dyld_image_count();
-    for (uint32_t i = 0; i < count; i++) {
-        const char *name = _dyld_get_image_name(i);
-        if (name && strstr(name, module_name)) {
-            return _dyld_get_image_vmaddr_slide(i); // استخراج عنوان الذاكرة الحقيقي
-        }
-    }
-    return 0;
-}
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+                  [fmt setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
+                  NSString *timestamp = [fmt stringFromDate:[NSDate]];
+                  
+                  NSString *icon = @"->";
+                  UIColor *textColor = [UIColor whiteColor];
+                  
+                  if (type == 1) { icon = @"✅"; textColor = [UIColor greenColor]; }      
+                  else if (type == 2) { icon = @"⚠️"; textColor = [UIColor yellowColor]; } 
+                  else if (type == 3) { icon = @"❌"; textColor = [UIColor redColor]; }    
+                  
+                  NSString *newLine = [NSString stringWithFormat:@"[%@] %@ %@\n", timestamp, icon, message];
+                  
+                  NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithAttributedString:self.logView.attributedText];
+                  NSAttributedString *newAttrStr = [[NSAttributedString alloc] initWithString:newLine attributes:@{NSForegroundColorAttributeName: textColor, NSFontAttributeName: [UIFont fontWithName:@"Courier-Bold" size:9]}];
+                  [attrStr appendAttributedString:newAttrStr];
+                  self.logView.attributedText = attrStr;
 
-// =========================================================
-// [🎯] التجسس على الدوال (Live Hook Tracing)
-// هذا هو التطبيق العملي للصورة التي أرسلتها يا جنرال
-// =========================================================
+                  NSRange range = NSMakeRange(self.logView.text.length - 1, 1);
+                  [self.logView scrollRangeToVisible:range];
+              });
+          }
 
-// 1. الدالة الأصلية التي سنختطفها (مثال: sub_1E7638 من صورتك)
-// نفترض أنها دالة تأخذ متغيرين (a1, a2) وتعيد رقماً (int)
-int (*orig_sub_1E7638)(uintptr_t a1, int a2, int a3);
+          - (void)clearLogs { self.logView.text = @""; }
+          - (void)togglePause {
+              self.isPaused = !self.isPaused;
+              [self.pauseBtn setTitle:(self.isPaused ? @"▶" : @"⏸") forState:UIControlStateNormal];
+              [self.pauseBtn setBackgroundColor:(self.isPaused ? [UIColor systemRedColor] : [UIColor systemBlueColor])];
+          }
+          - (void)hideTerminal { self.hidden = YES; }
+          - (void)handlePan:(UIPanGestureRecognizer *)s {
+              CGPoint t = [s translationInView:self.superview];
+              self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
+              [s setTranslation:CGPointZero inView:self.superview];
+          }
+          @end
 
-// 2. دالة الجاسوس الخاصة بالجنرال وسام (The Tracer)
-int my_tracer_sub_1E7638(uintptr_t a1, int a2, int a3) {
-    // أ. تسجيل لحظة الدخول للدالة والمتغيرات (كما في الترمنال بصورتك)
-    NSString *entryLog = [NSString stringWithFormat:@"Result of sub_1E7638(*a1=0x%lx, mode=%d)", a1, a2];
-    SOV_HOOK(entryLog);
-    
-    // ب. استدعاء الدالة الأصلية لكي لا تنهار اللعبة
-    int result = orig_sub_1E7638(a1, a2, a3);
-    
-    // ج. تسجيل لحظة الخروج والنتيجة (Return Value)
-    NSString *exitLog = [NSString stringWithFormat:@"sub_1E7638 returned %d", result];
-    if (result == 0) {
-        SOV_SUCCESS(exitLog); // 0 غالباً يعني نجاح/آمن
-    } else {
-        SOV_LOG(exitLog);
-    }
-    
-    return result;
-}
+          #define SOV_LOG(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:0]
+          #define SOV_HOOK(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:2]
+          #define SOV_SUCCESS(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:1]
 
-// =========================================================
-// [🚀] صاعق الانطلاق وحقن شرايين الذاكرة
-// =========================================================
-void __attribute__((constructor)) start_memory_tracer() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        
-        // 1. إظهار الترمنال
-        UIWindow *win = [UIApplication sharedApplication].keyWindow;
-        if (win) {
-            SovereignTerminal *terminal = [SovereignTerminal sharedTerminal];
-            [win addSubview:terminal];
-            
-            // نقر مزدوج بثلاث أصابع لإظهار وإخفاء الترمنال
-            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:terminal action:@selector(setHidden:)];
-            tap.numberOfTapsRequired = 2;
-            tap.numberOfTouchesRequired = 3; 
-            [win addGestureRecognizer:tap];
-        }
+          // =========================================================
+          // [🧠] العقل المدبر: ربط الذاكرة واستخراج الـ ASLR
+          // =========================================================
+          uintptr_t get_module_base(const char *module_name) {
+              uint32_t count = _dyld_image_count();
+              for (uint32_t i = 0; i < count; i++) {
+                  const char *name = _dyld_get_image_name(i);
+                  if (name && strstr(name, module_name)) {
+                      return _dyld_get_image_vmaddr_slide(i); 
+                  }
+              }
+              return 0;
+          }
 
-        SOV_SUCCESS(@"Sovereign Memory Tracer Initialized.");
+          // =========================================================
+          // [🎯] التجسس على الدوال (Live Hook Tracing)
+          // =========================================================
+          int (*orig_sub_1E7638)(uintptr_t a1, int a2, int a3);
 
-        // 2. البحث عن ملفات اللعبة في الذاكرة الحية (RAM)
-        uintptr_t anogs_base = get_module_base("anogs");
-        uintptr_t shadow_base = get_module_base("ShadowTrackerExtra");
+          int my_tracer_sub_1E7638(uintptr_t a1, int a2, int a3) {
+              NSString *entryLog = [NSString stringWithFormat:@"Result of sub_1E7638(*a1=0x%lx, mode=%d)", a1, a2];
+              SOV_HOOK(entryLog);
+              
+              int result = orig_sub_1E7638(a1, a2, a3);
+              
+              NSString *exitLog = [NSString stringWithFormat:@"sub_1E7638 returned %d", result];
+              if (result == 0) {
+                  SOV_SUCCESS(exitLog); 
+              } else {
+                  SOV_LOG(exitLog);
+              }
+              
+              return result;
+          }
 
-        if (anogs_base != 0) {
-            SOV_SUCCESS([NSString stringWithFormat:@"Linked to anogs memory! Slide: 0x%lx", anogs_base]);
-            
-            // 3. عملية زرع الجاسوس (Hooking the actual memory)
-            // نجمع عنوان ملف الحماية + الأوفست الذي استخرجته من IDA
-            uintptr_t target_offset = 0x1E7638; // الأوفست الذي في صورتك
-            uintptr_t target_function_in_ram = anogs_base + target_offset;
-            
-            // استخدام Substrate لاختطاف الدالة وتحويلها لترمنال الجنرال
-            MSHookFunction((void *)target_function_in_ram, (void *)my_tracer_sub_1E7638, (void **)&orig_sub_1E7638);
-            
-            SOV_LOG([NSString stringWithFormat:@"Tracer attached to sub_%llX", (unsigned long long)target_offset]);
-            
-        } else {
-            SOV_LOG(@"Waiting for anogs to load into memory...");
-        }
-    });
-}
+          // =========================================================
+          // [🚀] صاعق الانطلاق وحقن شرايين الذاكرة
+          // =========================================================
+          void __attribute__((constructor)) start_memory_tracer() {
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                  
+                  UIWindow *win = nil;
+                  if (@available(iOS 13.0, *)) {
+                      for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
+                          if (scene.activationState == UISceneActivationStateForegroundActive) { win = scene.windows.firstObject; break; }
+                      }
+                  }
+                  #pragma clang diagnostic push
+                  #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                  if (!win) win = [UIApplication sharedApplication].keyWindow;
+                  #pragma clang diagnostic pop
+
+                  if (win) {
+                      SovereignTerminal *terminal = [SovereignTerminal sharedTerminal];
+                      [win addSubview:terminal];
+                      
+                      UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:terminal action:@selector(setHidden:)];
+                      tap.numberOfTapsRequired = 2;
+                      tap.numberOfTouchesRequired = 3; 
+                      [win addGestureRecognizer:tap];
+                  }
+
+                  SOV_SUCCESS(@"Sovereign Memory Tracer Initialized.");
+
+                  uintptr_t anogs_base = get_module_base("anogs");
+
+                  if (anogs_base != 0) {
+                      SOV_SUCCESS([NSString stringWithFormat:@"Linked to anogs memory! Slide: 0x%lx", anogs_base]);
+                      
+                      uintptr_t target_offset = 0x1E7638; 
+                      uintptr_t target_function_in_ram = anogs_base + target_offset;
+                      
+                      MSHookFunction((void *)target_function_in_ram, (void *)my_tracer_sub_1E7638, (void **)&orig_sub_1E7638);
+                      
+                      SOV_LOG([NSString stringWithFormat:@"Tracer attached to sub_%llX", (unsigned long long)target_offset]);
+                      
+                  } else {
+                      SOV_LOG(@"Waiting for anogs to load into memory...");
+                  }
+              });
+          }
+          EOF
+
+          # [2] عملية الصهر العسكرية (The Forge)
+          export SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          
+          clang -dynamiclib -arch arm64 Sovereign_Live_Tracer.mm -o Sovereign_Tracer.dylib \
+          -isysroot $SDK_PATH \
+          -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore \
+          -fobjc-arc -O0 -w -lc++ -undefined dynamic_lookup
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sovereign-Tracer-Dylib
+          path: Sovereign_Tracer.dylib
