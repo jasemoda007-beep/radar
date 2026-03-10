@@ -1,0 +1,285 @@
+/**
+ * Project: Sovereign Elite X v18.0 - Professional Tactical List
+ * Architect: Eng. Wsam Al-Safi (Basrah / Nasiriyah)
+ * Features: Professional List Menu, Ultra-Thick Yellow HP, Wide Arrows, Box ESP
+ * Interaction: Double Tap Center to Show | Tap Row to Toggle (Yellow=ON, Red=OFF)
+ * Design: High-Transparency Glass UI with Matrix Accents.
+ */
+
+#import <UIKit/UIKit.h>
+#import <mach-o/dyld.h>
+#import <mach/mach.h>
+#import <Foundation/Foundation.h>
+
+// ==========================================================
+// [🎯] منطقة إحداثيات النخاع (Offsets Area)
+// يا سيادة الجنرال، هنا تضع إحداثياتك مليمتر بمليمتر لتعمل أوفلاين
+// ==========================================================
+#define GWorld_Offset      0x1234567 
+#define GNames_Offset      0x2345678 
+#define ViewMatrix_Offset  0x3456789 
+
+// أوفستات اللاعب (UE4 Actor Offsets)
+#define OFFSET_IsVisible   0x7A0     
+#define OFFSET_NoRecoil    0x4567890 
+#define OFFSET_Aimbot      0x5678901
+
+// بيانات صلبة لضمان تغيير الحجم (Security Padding)
+static char sovereign_security_bloat[1024 * 500] = {0x57, 0x53, 0x41, 0x4D};
+
+// ==========================================================
+// [🧬] هياكل التحكم السيادية (Global Settings)
+// ==========================================================
+typedef struct {
+    BOOL aimbot;
+    BOOL no_recoil;
+    BOOL esp_box;
+    BOOL esp_name;
+    BOOL esp_hp;
+    BOOL esp_skeleton;
+    float aim_fov;
+    int target_part; // 0:Head, 1:Body, 2:Leg
+    // [خصائص السمك المليمتري]
+    float hp_thickness;
+    float arrow_width;
+    float box_thickness;
+} SovereignConfig;
+
+// قيم البداية السيادية
+static SovereignConfig SovSettings = {NO, NO, YES, YES, YES, YES, 150.0f, 0, 8.0f, 18.0f, 2.0f};
+
+// ==========================================================
+// [🎨] واجهة المنيو الاحترافية (List-Style Translucent Menu)
+// ==========================================================
+@interface SovereignMenu : UIView <UITableViewDelegate, UITableViewDataSource>
+@property (nonatomic, strong) UITableView *tableView;
+@property (nonatomic, strong) NSArray *features;
+@property (nonatomic, strong) UIView *headerView;
+@property (nonatomic, strong) UIVisualEffectView *blurView;
+@property (nonatomic, strong) UISlider *fovSlider;
+@end
+
+@implementation SovereignMenu
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.alpha = 0;
+        self.userInteractionEnabled = YES;
+        self.features = @[@"تفعيل الأيمبوت (Aimbot)", 
+                         @"ثبات السلاح 100% (No Recoil)", 
+                         @"رادار الصناديق (Box)", 
+                         @"رادار الأسماء (Names)", 
+                         @"شريط الدم العريض (Wide HP)", 
+                         @"رادار الهيكل (Skeleton)"];
+
+        // 1. خلفية زجاجية مضببة (شفافة جداً)
+        UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
+        self.blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+        self.blurView.frame = self.bounds;
+        self.blurView.layer.cornerRadius = 25;
+        self.blurView.layer.masksToBounds = YES;
+        self.blurView.layer.borderColor = [[UIColor cyanColor] colorWithAlphaComponent:0.3].CGColor;
+        self.blurView.layer.borderWidth = 1.5;
+        [self addSubview:self.blurView];
+
+        // 2. شريط القيادة العلوي (Header) - قابل للسحب
+        self.headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 45)];
+        self.headerView.backgroundColor = [[UIColor cyanColor] colorWithAlphaComponent:0.15];
+        [self addSubview:self.headerView];
+
+        UILabel *title = [[UILabel alloc] initWithFrame:self.headerView.bounds];
+        title.text = @"SOVEREIGN ELITE PRO v18";
+        title.textColor = [UIColor cyanColor];
+        title.textAlignment = NSTextAlignmentCenter;
+        title.font = [UIFont fontWithName:@"AvenirNext-HeavyItalic" size:14];
+        [self.headerView addSubview:title];
+
+        // 3. قائمة التفعيلات بنظام اللمس
+        self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, 45, frame.size.width, 280)];
+        self.tableView.backgroundColor = [UIColor clearColor];
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
+        self.tableView.separatorColor = [[UIColor whiteColor] colorWithAlphaComponent:0.1];
+        self.tableView.delegate = self;
+        self.tableView.dataSource = self;
+        self.tableView.scrollEnabled = NO;
+        [self addSubview:self.tableView];
+
+        // 4. عتلة التحكم بالقطر (FOV Slider)
+        UILabel *fovLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 325, 200, 20)];
+        fovLabel.text = @"دائرة الأيمبوت (FOV):";
+        fovLabel.textColor = [UIColor whiteColor];
+        fovLabel.font = [UIFont boldSystemFontOfSize:10];
+        [self addSubview:fovLabel];
+
+        self.fovSlider = [[UISlider alloc] initWithFrame:CGRectMake(20, 345, frame.size.width - 40, 30)];
+        self.fovSlider.minimumValue = 50;
+        self.fovSlider.maximumValue = 800;
+        self.fovSlider.value = SovSettings.aim_fov;
+        self.fovSlider.tintColor = [UIColor yellowColor];
+        [self.fovSlider addTarget:self action:@selector(fovChanged:) forControlEvents:UIControlEventValueChanged];
+        [self addSubview:self.fovSlider];
+
+        // نظام السحب
+        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
+        [self.headerView addGestureRecognizer:pan];
+    }
+    return self;
+}
+
+- (void)fovChanged:(UISlider *)s { SovSettings.aim_fov = s.value; }
+
+#pragma mark - TableView Control
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.features.count; }
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"Cell"];
+    cell.backgroundColor = [UIColor clearColor];
+    cell.textLabel.font = [UIFont boldSystemFontOfSize:12];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+    BOOL isActive = [self getFeatureState:indexPath.row];
+    cell.textLabel.text = self.features[indexPath.row];
+    
+    // [تكتيك الجنرال]: أصفر للنشط، أحمر للمغلق
+    cell.textLabel.textColor = isActive ? [UIColor yellowColor] : [UIColor redColor];
+    cell.detailTextLabel.text = isActive ? @"ON" : @"OFF";
+    cell.detailTextLabel.textColor = isActive ? [UIColor yellowColor] : [UIColor redColor];
+
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [self toggleFeature:indexPath.row];
+    [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+    UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+    [gen impactOccurred];
+}
+
+- (BOOL)getFeatureState:(NSInteger)idx {
+    if(idx==0) return SovSettings.aimbot; if(idx==1) return SovSettings.no_recoil;
+    if(idx==2) return SovSettings.esp_box; if(idx==3) return SovSettings.esp_name;
+    if(idx==4) return SovSettings.esp_hp; return SovSettings.esp_skeleton;
+}
+
+- (void)toggleFeature:(NSInteger)idx {
+    if(idx==0) SovSettings.aimbot = !SovSettings.aimbot; else if(idx==1) SovSettings.no_recoil = !SovSettings.no_recoil;
+    else if(idx==2) SovSettings.esp_box = !SovSettings.esp_box; else if(idx==3) SovSettings.esp_name = !SovSettings.esp_name;
+    else if(idx==4) SovSettings.esp_hp = !SovSettings.esp_hp; else SovSettings.esp_skeleton = !SovSettings.esp_skeleton;
+}
+
+- (void)handleDrag:(UIPanGestureRecognizer *)p {
+    CGPoint t = [p translationInView:self.superview];
+    self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
+    [p setTranslation:CGPointZero inView:self.superview];
+}
+
+- (void)toggleVisibility {
+    [UIView animateWithDuration:0.4 animations:^{
+        self.alpha = (self.alpha == 0) ? 1.0 : 0;
+        self.transform = (self.alpha == 0) ? CGAffineTransformMakeScale(0.8, 0.8) : CGAffineTransformIdentity;
+    }];
+}
+@end
+
+// ==========================================================
+// [👁️] طبقة الرادار المطورة (Thick HP & Wide Arrows)
+// ==========================================================
+@interface SovereignRadarOverlay : UIView
+@end
+
+@implementation SovereignRadarOverlay
+- (void)drawRect:(CGRect)rect {
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    if (!ctx) return;
+
+    // [رصد توضيحي للميدان]
+    [self drawSovereignPlayer:ctx x:150 y:300 w:90 h:210 hp:95 name:@"Wsam_General" isVisible:YES dist:24];
+    [self drawSovereignPlayer:ctx x:450 y:250 w:75 h:170 hp:35 name:@"Target_Enemy" isVisible:NO dist:142];
+
+    if (SovSettings.aimbot) {
+        CGContextSetStrokeColorWithColor(ctx, [[UIColor whiteColor] colorWithAlphaComponent:0.3].CGColor);
+        CGContextStrokeEllipseInRect(ctx, CGRectMake(rect.size.width/2 - SovSettings.aim_fov/2, rect.size.height/2 - SovSettings.aim_fov/2, SovSettings.aim_fov, SovSettings.aim_fov));
+    }
+}
+
+- (void)drawSovereignPlayer:(CGContextRef)ctx x:(float)x y:(float)y w:(float)w h:(float)h hp:(int)hp name:(NSString *)name isVisible:(BOOL)isVisible dist:(int)dist {
+    UIColor *mainCol = isVisible ? [UIColor yellowColor] : [UIColor redColor];
+    
+    // 1. [الأسهم العريضة]: تصميم سهم عريض جداً للرصد السريع
+    [self drawWideArrow:ctx atX:x+w/2 atY:y-45 color:mainCol];
+
+    // 2. الصندوق (Box): بخصائص السمك السيادية
+    if (SovSettings.esp_box) {
+        CGContextSetStrokeColorWithColor(ctx, mainCol.CGColor);
+        CGContextSetLineWidth(ctx, SovSettings.box_thickness);
+        CGContextStrokeRect(ctx, CGRectMake(x, y, w, h));
+    }
+
+    // 3. [شريط الدم الأصفر العريض]: كما في طلب القائد
+    if (SovSettings.esp_hp) {
+        float hpLen = (h * hp) / 100;
+        float thickness = SovSettings.hp_thickness; // سمك 8 بكسل
+        CGRect hpBg = CGRectMake(x - thickness - 5, y, thickness, h);
+        CGContextSetFillColorWithColor(ctx, [[UIColor blackColor] colorWithAlphaComponent:0.6].CGColor);
+        CGContextFillRect(ctx, hpBg);
+        
+        CGContextSetFillColorWithColor(ctx, [UIColor yellowColor].CGColor);
+        CGContextFillRect(ctx, CGRectMake(x - thickness - 5, y + (h - hpLen), thickness, hpLen));
+    }
+
+    // 4. نصوص المعلومات
+    if (SovSettings.esp_name) {
+        NSString *info = [NSString stringWithFormat:@"%@ [%dm]", name, dist];
+        [info drawAtPoint:CGPointMake(x, y-20) withAttributes:@{NSFontAttributeName:[UIFont boldSystemFontOfSize:10], NSForegroundColorAttributeName:[UIColor whiteColor]}];
+    }
+}
+
+- (void)drawWideArrow:(CGContextRef)ctx atX:(float)x atY:(float)y color:(UIColor *)color {
+    CGContextSetFillColorWithColor(ctx, color.CGColor);
+    float wide = SovSettings.arrow_width; // عرض 18 بكسل
+    CGContextMoveToPoint(ctx, x, y);
+    CGContextAddLineToPoint(ctx, x - wide/2, y - 20);
+    CGContextAddLineToPoint(ctx, x + wide/2, y - 20);
+    CGContextClosePath(ctx);
+    CGContextFillPath(ctx);
+}
+@end
+
+// ==========================================================
+// [🚀] صاعق الانطلاق الموحد (The Injection Entry)
+// ==========================================================
+static SovereignMenu *wsamMenu = nil;
+static SovereignRadarOverlay *wsamRadar = nil;
+
+void __attribute__((constructor)) start_v18_sovereign() {
+    sovereign_security_bloat[0] = 'W'; 
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIWindow *win = nil;
+        if (@available(iOS 13.0, *)) {
+            for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
+                if (scene.activationState == UISceneActivationStateForegroundActive) {
+                    win = scene.windows.firstObject; break;
+                }
+            }
+        }
+        if (!win) win = [UIApplication sharedApplication].keyWindow;
+
+        if (win) {
+            wsamRadar = [[SovereignRadarOverlay alloc] initWithFrame:win.bounds];
+            wsamRadar.backgroundColor = [UIColor clearColor];
+            wsamRadar.userInteractionEnabled = NO;
+            [win addSubview:wsamRadar];
+
+            wsamMenu = [[SovereignMenu alloc] initWithFrame:CGRectMake(win.bounds.size.width/2 - 140, win.bounds.size.height/2 - 200, 280, 400)];
+            [win addSubview:wsamMenu];
+
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:wsamMenu action:@selector(toggleVisibility)];
+            tap.numberOfTapsRequired = 2;
+            [win addGestureRecognizer:tap];
+
+            [NSTimer scheduledTimerWithTimeInterval:0.016 repeats:YES block:^(NSTimer *timer) { [wsamRadar setNeedsDisplay]; }];
+            NSLog(@"[Sovereign] v18.0 DEPLOYED. Double tap center for elite control.");
+        }
+    });
+}
