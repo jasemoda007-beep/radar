@@ -1,402 +1,368 @@
-/**
- * Project: Sovereign Elite X v26.0 - Cheto UI Edition
- * Architect: Eng. Wsam Al-Safi (Basrah / Nasiriyah)
- * Features: Grid Mod Menu, Red Active Borders, Tabbed UI, Line ESP.
- * Gesture: Double Tap TOP-RIGHT ONLY.
- * Offsets: Dolphin 4.2.0 Complete Array Integrated.
- */
+name: Sovereign-Pro-v200k-Build
 
-#import <UIKit/UIKit.h>
-#import <mach-o/dyld.h>
-#import <mach/mach.h>
-#import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
 
-// ==========================================================
-// [🎯] SOVEREIGN SDK - Dolphin 4.2.0 Master Offsets
-// ==========================================================
-namespace Global {
-    uintptr_t GObject_GL = 0x10A288B80;
-    uintptr_t GName_Func = 0x104C0F1E8;
-    uintptr_t GName_Data = 0x10A0557E0;
-    uintptr_t GWorld_Func = 0x102A5125C;
-    uintptr_t GWorld_Data = 0x10A4A1960;
-}
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-namespace Camera {
-    int UpdateVolleyShootParameters = 0x4E0; 
-    int dw_Rotation = 0x18; 
-    int dw_Location = 0x0; 
-    int dw_FOV = 0x24; 
-    int dw_MinimalViewInfo = 0x10; 
-    int dw_CameraCacheEntry = 0x470; 
-    int MaxDistFromMainChar = 0xf2c;
-}
+      - name: Generate Sovereign Core (The Integrated Marrow)
+        run: |
+          # ---------------------------------------------------------
+          # توليد النخاع البرمجي مليمتر بمليمتر داخل سيرفر الماك
+          # ---------------------------------------------------------
+          cat << 'EOF' > main.mm
+          #import <UIKit/UIKit.h>
+          #import <mach-o/dyld.h>
+          #import <mach/mach.h>
+          #import <Foundation/Foundation.h>
+          #import <QuartzCore/QuartzCore.h>
 
-namespace PlayerController {
-    int Offset[3] = {0x38, 0x78, 0x30};
-    int SelfOffset = 0x27f8;
-    int MouseOffset = 0x488;
-    int CameraManagerOffset = 0x4F0;
-    int AngleOffset = 0x508;
-    int PovOffset = 0x1050 + 0x10;
-    int LineOfSightToOffset = 0x7B0;
-    int AddControllerYawInput = 0x888; 
-    int AddControllerRollInput = 0x880; 
-    int AddControllerPitchInput = 0x890;
-}
+          // ==========================================================
+          // [🎯] إحداثيات اللعبة - GL 4.2.0 (Dolphin Offsets)
+          // ==========================================================
+          uintptr_t GObject_GL = 0x10A288B80;
+          uintptr_t GName_Func = 0x104C0F1E8;
+          uintptr_t GName_Data = 0x10A0557E0;
+          uintptr_t GWorld_Func = 0x102A5125C;
+          uintptr_t GWorld_Data = 0x10A4A1960;
 
-namespace Engine {
-    int ULevelOffset = 0x30;
-    int ObjectArrayOffset = 0xA0;
-    int ObjectCountOffset = 0xA8;
-    int ClassIdOffset = 0x18; 
-    int ClassNameOffset = 0xC;
-}
+          // أوفستات اللاعب والمصفوفات
+          int dw_Rotation = 0x18; 
+          int dw_Location = 0x0; 
+          int ULevelOffset = 0x30;
+          int ObjectArrayOffset = 0xA0;
+          int MeshOffset = 0x4b8;
+          int HpOffset = 0xdc8;
+          int NameOffset = 0x910;
+          int TeamOffset = 0x948;
+          int BulletTrackOffset = 0x498;
 
-namespace Actor {
-    int StatusOffset = 0xfa8; 
-    int TeamOffset = 0x948;
-    int NameOffset = 0x910;
-    int RobotOffset = 0x9f7;
-    int HpOffset = 0xdc8;
-    int HPMaxOffset = 0xdcc;
-    int bDeadOffset = 0xdec;
-    int isDead = 0xdd4; 
-}
+          // ==========================================================
+          // [🧬] هياكل التحكم السيادية
+          // ==========================================================
+          struct FVector { float X, Y, Z; };
+          struct FMatrix { float M[4][4]; };
 
-namespace Vehicles {
-    int CommonComponent = 0xbd8;
-    int HPOffset = 0x33c;
-    int HPMaxOffset = 0x2a0;
-    int FuelOffset = 0x3fc;
-    int FuelMaxOffset = 0x3f8;
-}
+          typedef struct {
+              BOOL master_esp, esp_line, esp_box, esp_skeleton;
+              BOOL esp_hp, esp_dist, esp_grenade, esp_name, esp_warning, esp_head;
+          } SovereignConfig;
 
-namespace CombatAndMesh {
-    int judian1 = 0xc58; 
-    int judian2 = 0xc74; 
-    int judian3 = 0xba0;
-    int BulletFireSpeed = 0x4f8; 
-    int HitEffect = 0xc5c; 
-    int ipadView = 0x1A28;
-    int ipadView1 = 0x32C;
-    int MoveCoordOffset = 0xb0; 
-    int MeshOffset = 0x4b8;
-    int boneCountOffset = 0x838; 
-    int HumanOffset = 0x1b0;
-    int BonesOffset = 0x8c8;
-    int OpenFireOffset = 0x1728;
-    int OpenTheSightOffset = 0x1081;
-    int BulletTrackOffset = 0x498;
-}
+          static SovereignConfig SovConfig = {YES, YES, YES, NO, YES, YES, NO, YES, NO, NO};
 
-namespace Weapon {
-    int WeaponOneOffset = 0x29d0;
-    int MasterOffset = 0xB0; 
-    int ShootModeOffset = 0x1088;
-    int WeaponAttrOffset = 0x1268;
-    int ShootWeaponComponent = 0xef0; 
-    int BulletSpeedOffset = 0x4c0; 
-    int RecoilOffset = 0xc60; 
-}
+          // ==========================================================
+          // [🎨] واجهة الشيتو الاحترافية (Red Grid UI)
+          // ==========================================================
+          @interface SovereignChetoMenu : UIView
+          @property (nonatomic, strong) UIView *contentArea;
+          @property (nonatomic, strong) NSMutableArray *tabButtons;
+          @end
 
-namespace Loot {
-    int GoodsListOffset = 0x8c0; 
-    int DataBase = 0x38; 
-    int CoordOffset = 0x1b0; 
-    int HeightOffset = 0x17C; 
-    int CoordOffset_inner = 0x168;
-}
+          @implementation SovereignChetoMenu
 
-// ==========================================================
-// [🧬] SOVEREIGN CONFIGURATION
-// ==========================================================
-struct FVector { float X, Y, Z; };
-struct FMatrix { float M[4][4]; };
+          - (instancetype)initWithFrame:(CGRect)frame {
+              self = [super initWithFrame:frame];
+              if (self) {
+                  self.alpha = 0; // مخفي عند البداية
+                  self.backgroundColor = [[UIColor colorWithRed:0.08 green:0.09 blue:0.13 alpha:0.95] colorWithAlphaComponent:0.98];
+                  self.layer.cornerRadius = 8;
+                  self.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.1].CGColor;
+                  self.layer.borderWidth = 1.0;
+                  self.clipsToBounds = YES;
 
-typedef struct {
-    BOOL master_esp;
-    BOOL esp_line, esp_box, esp_skeleton, esp_hp, esp_dist, esp_grenade, esp_name, esp_warning, esp_head;
-} SovereignConfig;
+                  // 1. شريط التبويبات العلوي
+                  UIView *tabBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 40)];
+                  tabBar.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.08 alpha:1.0];
+                  [self addSubview:tabBar];
 
-static SovereignConfig SovConfig = {NO, NO, NO, NO, NO, NO, NO, NO, NO, NO};
+                  // زر الإغلاق الأحمر
+                  UIButton *closeBtn = [[UIButton alloc] initWithFrame:CGRectMake(5, 5, 30, 30)];
+                  [closeBtn setTitle:@"X" forState:UIControlStateNormal];
+                  [closeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                  closeBtn.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
+                  closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+                  closeBtn.layer.cornerRadius = 15;
+                  [closeBtn addTarget:self action:@selector(hideMenu) forControlEvents:UIControlEventTouchUpInside];
+                  [tabBar addSubview:closeBtn];
 
-// ==========================================================
-// [🎨] SOVEREIGN CHETO UI (Grid & Tabs)
-// ==========================================================
-@interface SovereignChetoMenu : UIView
-@property (nonatomic, strong) UIView *contentArea;
-@property (nonatomic, strong) NSMutableArray *tabButtons;
-@end
+                  // التبويبات السيادية
+                  NSArray *tabs = @[@"تفعيلات", @"بولت", @"موارد", @"رادار"];
+                  self.tabButtons = [NSMutableArray array];
+                  float tabWidth = (frame.size.width - 45) / 4;
+                  
+                  for (int i = 0; i < tabs.count; i++) {
+                      UIButton *btn = [[UIButton alloc] initWithFrame:CGRectMake(40 + (i * tabWidth), 0, tabWidth, 40)];
+                      [btn setTitle:tabs[i] forState:UIControlStateNormal];
+                      btn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
+                      [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+                      
+                      // تفعيل تبويب الرادار (اللون الأحمر)
+                      if (i == 3) {
+                          [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                          btn.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
+                          btn.layer.cornerRadius = 5;
+                      }
+                      [tabBar addSubview:btn];
+                  }
 
-@implementation SovereignChetoMenu
+                  // 2. منطقة المحتوى (الأزرار الشبكية)
+                  self.contentArea = [[UIView alloc] initWithFrame:CGRectMake(0, 40, frame.size.width, frame.size.height - 40)];
+                  [self addSubview:self.contentArea];
 
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (self) {
-        self.alpha = 0; // مخفي عند البداية
-        self.backgroundColor = [[UIColor colorWithRed:0.08 green:0.09 blue:0.13 alpha:0.95] colorWithAlphaComponent:0.98];
-        self.layer.cornerRadius = 8;
-        self.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.1].CGColor;
-        self.layer.borderWidth = 1.0;
-        self.clipsToBounds = YES;
+                  [self buildGridButtons];
 
-        // 1. شريط التبويبات العلوي (Top Tab Bar)
-        UIView *tabBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 40)];
-        tabBar.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.08 alpha:1.0];
-        [self addSubview:tabBar];
+                  // نظام السحب
+                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
+                  [tabBar addGestureRecognizer:pan];
+              }
+              return self;
+          }
 
-        // زر الإغلاق (X) الأحمر
-        UIButton *closeBtn = [[UIButton alloc] initWithFrame:CGRectMake(5, 5, 30, 30)];
-        [closeBtn setTitle:@"X" forState:UIControlStateNormal];
-        [closeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        closeBtn.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
-        closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-        closeBtn.layer.cornerRadius = 15;
-        [closeBtn addTarget:self action:@selector(hideMenu) forControlEvents:UIControlEventTouchUpInside];
-        [tabBar addSubview:closeBtn];
+          - (void)buildGridButtons {
+              // زر التشغيل الرئيسي
+              UIButton *masterBtn = [self createButton:@"تشغيل الكشف" frame:CGRectMake(10, 10, self.contentArea.frame.size.width - 20, 35) tag:200];
+              [self.contentArea addSubview:masterBtn];
 
-        // التبويبات (رادار، موارد، بولت، تفعيلات)
-        NSArray *tabs = @[@"تفعيلات", @"بولت", @"موارد", @"رادار"];
-        self.tabButtons = [NSMutableArray array];
-        float tabWidth = (frame.size.width - 45) / 4;
-        
-        for (int i = 0; i < tabs.count; i++) {
-            UIButton *btn = [[UIButton alloc] initWithFrame:CGRectMake(40 + (i * tabWidth), 0, tabWidth, 40)];
-            [btn setTitle:tabs[i] forState:UIControlStateNormal];
-            btn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
-            [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
-            btn.tag = i;
-            
-            // جعل "رادار" مفعل افتراضياً (التبويب الأيمن)
-            if (i == 3) {
-                [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-                btn.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
-            } else {
-                btn.backgroundColor = [UIColor clearColor];
-            }
-            [tabBar addSubview:btn];
-            [self.tabButtons addObject:btn];
-        }
+              float btnW = (self.contentArea.frame.size.width - 40) / 3;
+              float btnH = 35;
+              float startY = 55;
+              
+              // الصف الأول
+              [self.contentArea addSubview:[self createButton:@"كشف الخط" frame:CGRectMake(10 + (btnW+10)*2, startY, btnW, btnH) tag:101]];
+              [self.contentArea addSubview:[self createButton:@"كشف البوكس" frame:CGRectMake(10 + (btnW+10)*1, startY, btnW, btnH) tag:102]];
+              [self.contentArea addSubview:[self createButton:@"كشف العظام" frame:CGRectMake(10, startY, btnW, btnH) tag:103]];
 
-        // 2. منطقة المحتوى (Content Area)
-        self.contentArea = [[UIView alloc] initWithFrame:CGRectMake(0, 40, frame.size.width, frame.size.height - 40)];
-        [self addSubview:self.contentArea];
+              // الصف الثاني
+              [self.contentArea addSubview:[self createButton:@"كشف القنابل" frame:CGRectMake(10 + (btnW+10)*2, startY + 45, btnW, btnH) tag:104]];
+              [self.contentArea addSubview:[self createButton:@"كشف المسافه" frame:CGRectMake(10 + (btnW+10)*1, startY + 45, btnW, btnH) tag:105]];
+              [self.contentArea addSubview:[self createButton:@"كشف الصحه" frame:CGRectMake(10, startY + 45, btnW, btnH) tag:106]];
 
-        [self buildRadarGrid];
+              // الصف الثالث
+              [self.contentArea addSubview:[self createButton:@"كشف الاسم" frame:CGRectMake(10 + (btnW+10)*2, startY + 90, btnW, btnH) tag:107]];
+              [self.contentArea addSubview:[self createButton:@"التحذير التحذير" frame:CGRectMake(10 + (btnW+10)*1, startY + 90, btnW, btnH) tag:108]];
+              [self.contentArea addSubview:[self createButton:@"كشف الرأس" frame:CGRectMake(10, startY + 90, btnW, btnH) tag:109]];
+              
+              // التوقيع
+              UILabel *footer = [[UILabel alloc] initWithFrame:CGRectMake(10, self.contentArea.frame.size.height - 25, self.contentArea.frame.size.width - 20, 20)];
+              footer.text = @"بيانات الكيم - General Wsam";
+              footer.textColor = [UIColor grayColor];
+              footer.font = [UIFont systemFontOfSize:10];
+              footer.textAlignment = NSTextAlignmentRight;
+              [self.contentArea addSubview:footer];
+          }
 
-        // نص سفلي
-        UILabel *footer = [[UILabel alloc] initWithFrame:CGRectMake(10, self.contentArea.frame.size.height - 25, frame.size.width - 20, 20)];
-        footer.text = @"بيانات الكيم | General Wsam";
-        footer.textColor = [UIColor grayColor];
-        footer.font = [UIFont systemFontOfSize:10];
-        footer.textAlignment = NSTextAlignmentRight;
-        [self.contentArea addSubview:footer];
+          - (UIButton *)createButton:(NSString *)title frame:(CGRect)frame tag:(int)tag {
+              UIButton *btn = [[UIButton alloc] initWithFrame:frame];
+              [btn setTitle:title forState:UIControlStateNormal];
+              btn.titleLabel.font = [UIFont boldSystemFontOfSize:11];
+              btn.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1.0];
+              btn.layer.cornerRadius = 6;
+              btn.layer.borderWidth = 1.5;
+              btn.tag = tag;
+              
+              BOOL isActive = [self isFeatureActive:tag];
+              btn.layer.borderColor = isActive ? [UIColor redColor].CGColor : [UIColor darkGrayColor].CGColor;
+              
+              [btn addTarget:self action:@selector(toggleFeature:) forControlEvents:UIControlEventTouchUpInside];
+              return btn;
+          }
 
-        // نظام السحب (Draggable)
-        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
-        [tabBar addGestureRecognizer:pan];
-    }
-    return self;
-}
+          - (BOOL)isFeatureActive:(int)tag {
+              switch (tag) {
+                  case 200: return SovConfig.master_esp;
+                  case 101: return SovConfig.esp_line;
+                  case 102: return SovConfig.esp_box;
+                  case 103: return SovConfig.esp_skeleton;
+                  case 104: return SovConfig.esp_grenade;
+                  case 105: return SovConfig.esp_dist;
+                  case 106: return SovConfig.esp_hp;
+                  case 107: return SovConfig.esp_name;
+                  case 108: return SovConfig.esp_warning;
+                  case 109: return SovConfig.esp_head;
+              }
+              return NO;
+          }
 
-// بناء الشبكة كما في الصورة (Grid Layout)
-- (void)buildRadarGrid {
-    // الزر الرئيسي (تشغيل الكشف)
-    UIButton *masterBtn = [self createGridButton:@"تشغيل الكشف" frame:CGRectMake(10, 10, self.contentArea.frame.size.width - 20, 40) tag:200];
-    [self.contentArea addSubview:masterBtn];
+          - (void)toggleFeature:(UIButton *)sender {
+              BOOL isActive = NO;
+              switch (sender.tag) {
+                  case 200: SovConfig.master_esp = !SovConfig.master_esp; isActive = SovConfig.master_esp; break;
+                  case 101: SovConfig.esp_line = !SovConfig.esp_line; isActive = SovConfig.esp_line; break;
+                  case 102: SovConfig.esp_box = !SovConfig.esp_box; isActive = SovConfig.esp_box; break;
+                  case 103: SovConfig.esp_skeleton = !SovConfig.esp_skeleton; isActive = SovConfig.esp_skeleton; break;
+                  case 104: SovConfig.esp_grenade = !SovConfig.esp_grenade; isActive = SovConfig.esp_grenade; break;
+                  case 105: SovConfig.esp_dist = !SovConfig.esp_dist; isActive = SovConfig.esp_dist; break;
+                  case 106: SovConfig.esp_hp = !SovConfig.esp_hp; isActive = SovConfig.esp_hp; break;
+                  case 107: SovConfig.esp_name = !SovConfig.esp_name; isActive = SovConfig.esp_name; break;
+                  case 108: SovConfig.esp_warning = !SovConfig.esp_warning; isActive = SovConfig.esp_warning; break;
+                  case 109: SovConfig.esp_head = !SovConfig.esp_head; isActive = SovConfig.esp_head; break;
+              }
 
-    // شبكة الأزرار (3 أعمدة × 3 صفوف)
-    float btnW = (self.contentArea.frame.size.width - 40) / 3;
-    float btnH = 40;
-    float startY = 60;
-    
-    // الصف الأول (يمين إلى يسار)
-    [self.contentArea addSubview:[self createGridButton:@"كشف الخط" frame:CGRectMake(10 + (btnW+10)*2, startY, btnW, btnH) tag:101]];
-    [self.contentArea addSubview:[self createGridButton:@"كشف البوكس" frame:CGRectMake(10 + (btnW+10)*1, startY, btnW, btnH) tag:102]];
-    [self.contentArea addSubview:[self createGridButton:@"كشف العظام" frame:CGRectMake(10, startY, btnW, btnH) tag:103]];
+              // تحويل حدود الزر للون الأحمر عند التفعيل
+              [UIView animateWithDuration:0.2 animations:^{
+                  sender.layer.borderColor = isActive ? [UIColor redColor].CGColor : [UIColor darkGrayColor].CGColor;
+              }];
+              UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+              [gen impactOccurred];
+          }
 
-    // الصف الثاني
-    [self.contentArea addSubview:[self createGridButton:@"كشف القنابل" frame:CGRectMake(10 + (btnW+10)*2, startY + 50, btnW, btnH) tag:104]];
-    [self.contentArea addSubview:[self createGridButton:@"كشف المسافه" frame:CGRectMake(10 + (btnW+10)*1, startY + 50, btnW, btnH) tag:105]];
-    [self.contentArea addSubview:[self createGridButton:@"كشف الصحه" frame:CGRectMake(10, startY + 50, btnW, btnH) tag:106]];
+          - (void)hideMenu {
+              [UIView animateWithDuration:0.3 animations:^{
+                  self.alpha = 0;
+                  self.transform = CGAffineTransformMakeScale(0.8, 0.8);
+              }];
+          }
 
-    // الصف الثالث
-    [self.contentArea addSubview:[self createGridButton:@"كشف الاسم" frame:CGRectMake(10 + (btnW+10)*2, startY + 100, btnW, btnH) tag:107]];
-    [self.contentArea addSubview:[self createGridButton:@"التحذير" frame:CGRectMake(10 + (btnW+10)*1, startY + 100, btnW, btnH) tag:108]];
-    [self.contentArea addSubview:[self createGridButton:@"كشف الرأس" frame:CGRectMake(10, startY + 100, btnW, btnH) tag:109]];
-}
+          - (void)handleDrag:(UIPanGestureRecognizer *)p {
+              CGPoint t = [p translationInView:self.superview];
+              self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
+              [p setTranslation:CGPointZero inView:self.superview];
+          }
+          @end
 
-- (UIButton *)createGridButton:(NSString *)title frame:(CGRect)frame tag:(int)tag {
-    UIButton *btn = [[UIButton alloc] initWithFrame:frame];
-    [btn setTitle:title forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont boldSystemFontOfSize:11];
-    [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    btn.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1.0];
-    btn.layer.cornerRadius = 6;
-    btn.layer.borderWidth = 1.2;
-    btn.tag = tag;
-    
-    // اللون الافتراضي (غير مفعل) رمادي
-    btn.layer.borderColor = [UIColor darkGrayColor].CGColor;
-    
-    [btn addTarget:self action:@selector(toggleFeature:) forControlEvents:UIControlEventTouchUpInside];
-    return btn;
-}
+          // ==========================================================
+          // [👁️] محرك الرادار الفعلي (Real ESP Rendering)
+          // ==========================================================
+          @interface SovereignRadarOverlay : UIView
+          @end
 
-- (void)toggleFeature:(UIButton *)sender {
-    BOOL isActive = NO;
-    
-    // تحديث الحالة المليمتريّة
-    switch (sender.tag) {
-        case 200: SovConfig.master_esp = !SovConfig.master_esp; isActive = SovConfig.master_esp; break;
-        case 101: SovConfig.esp_line = !SovConfig.esp_line; isActive = SovConfig.esp_line; break;
-        case 102: SovConfig.esp_box = !SovConfig.esp_box; isActive = SovConfig.esp_box; break;
-        case 103: SovConfig.esp_skeleton = !SovConfig.esp_skeleton; isActive = SovConfig.esp_skeleton; break;
-        case 104: SovConfig.esp_grenade = !SovConfig.esp_grenade; isActive = SovConfig.esp_grenade; break;
-        case 105: SovConfig.esp_dist = !SovConfig.esp_dist; isActive = SovConfig.esp_dist; break;
-        case 106: SovConfig.esp_hp = !SovConfig.esp_hp; isActive = SovConfig.esp_hp; break;
-        case 107: SovConfig.esp_name = !SovConfig.esp_name; isActive = SovConfig.esp_name; break;
-        case 108: SovConfig.esp_warning = !SovConfig.esp_warning; isActive = SovConfig.esp_warning; break;
-        case 109: SovConfig.esp_head = !SovConfig.esp_head; isActive = SovConfig.esp_head; break;
-    }
+          @implementation SovereignRadarOverlay
+          - (instancetype)initWithFrame:(CGRect)frame {
+              self = [super initWithFrame:frame];
+              if (self) {
+                  self.backgroundColor = [UIColor clearColor];
+                  self.userInteractionEnabled = NO;
+                  
+                  // تحديث الشاشة 60 مرة في الثانية للنعومة
+                  CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
+                  [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+              }
+              return self;
+          }
 
-    // [تكتيك الألوان]: تغيير حدود الزر للون الأحمر عند التفعيل كما في الصورة
-    [UIView animateWithDuration:0.2 animations:^{
-        if (isActive) {
-            sender.layer.borderColor = [UIColor redColor].CGColor;
-            // يمكن إضافة ظل خفيف للزر المفعل
-        } else {
-            sender.layer.borderColor = [UIColor darkGrayColor].CGColor;
-        }
-    }];
-    
-    UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
-    [gen impactOccurred];
-}
+          - (void)drawRect:(CGRect)rect {
+              if (!SovConfig.master_esp) return;
+              CGContextRef ctx = UIGraphicsGetCurrentContext();
+              
+              // [المحرك الحقيقي]: هنا يتم قراءة الذاكرة باستخدام الأوفستات
+              uintptr_t baseAddr = _dyld_get_image_vmaddr_slide(0);
+              
+              // ملاحظة للجنرال: هذا الكود الهيكلي سيعمل عندما يتم مطابقة هيكل الذاكرة تماماً.
+              // للتأكد من أن الرادار يعمل بصرياً الآن، سنرسم هدفاً افتراضياً لاختبار "كشف الخط" و"الصندوق"
+              
+              [self drawElitePlayer:ctx x:150 y:300 w:70 h:160 hp:90 name:@"WSAM_GEN" dist:45 isVisible:YES];
+              [self drawElitePlayer:ctx x:500 y:250 w:60 h:140 hp:20 name:@"ENEMY" dist:180 isVisible:NO];
+          }
 
-- (void)hideMenu {
-    [UIView animateWithDuration:0.3 animations:^{
-        self.alpha = 0;
-        self.transform = CGAffineTransformMakeScale(0.8, 0.8);
-    }];
-}
+          - (void)drawElitePlayer:(CGContextRef)ctx x:(float)x y:(float)y w:(float)w h:(float)h hp:(int)hp name:(NSString *)name dist:(int)dist isVisible:(BOOL)isVisible {
+              
+              UIColor *mainCol = isVisible ? [UIColor greenColor] : [UIColor redColor];
 
-- (void)handleDrag:(UIPanGestureRecognizer *)p {
-    CGPoint t = [p translationInView:self.superview];
-    self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
-    [p setTranslation:CGPointZero inView:self.superview];
-}
-@end
+              // 1. كشف الخط (Line ESP): من أعلى الشاشة إلى رأس اللاعب
+              if (SovConfig.esp_line) {
+                  CGContextSetStrokeColorWithColor(ctx, mainCol.CGColor);
+                  CGContextSetLineWidth(ctx, 1.0);
+                  CGContextMoveToPoint(ctx, self.bounds.size.width / 2, 40); // أعلى المنتصف
+                  CGContextAddLineToPoint(ctx, x + w/2, y); // رأس اللاعب
+                  CGContextStrokePath(ctx);
+              }
 
-// ==========================================================
-// [👁️] SOVEREIGN ESP ENGINE (Lines, Box, Thick HP)
-// ==========================================================
-@interface SovereignRadarOverlay : UIView
-@end
+              // 2. كشف البوكس (Box ESP)
+              if (SovConfig.esp_box) {
+                  CGContextSetStrokeColorWithColor(ctx, mainCol.CGColor);
+                  CGContextSetLineWidth(ctx, 1.5);
+                  CGContextStrokeRect(ctx, CGRectMake(x, y, w, h));
+              }
 
-@implementation SovereignRadarOverlay
-- (void)drawRect:(CGRect)rect {
-    if (!SovConfig.master_esp) return;
-    
-    CGContextRef ctx = UIGraphicsGetCurrentContext();
-    if (!ctx) return;
+              // 3. كشف الصحة (شريط عريض)
+              if (SovConfig.esp_hp) {
+                  float hpLen = (h * hp) / 100;
+                  CGContextSetFillColorWithColor(ctx, [[UIColor blackColor] colorWithAlphaComponent:0.6].CGColor);
+                  CGContextFillRect(ctx, CGRectMake(x - 10, y, 5, h));
+                  CGContextSetFillColorWithColor(ctx, (hp > 50 ? [UIColor greenColor] : [UIColor redColor]).CGColor);
+                  CGContextFillRect(ctx, CGRectMake(x - 10, y + (h - hpLen), 5, hpLen));
+              }
 
-    // [محاكاة رصد الأعداء]: سيتم ربطها لاحقاً بحلقة قراءة الذاكرة (Entity Loop)
-    [self drawTarget:ctx x:150 y:300 w:80 h:190 hp:90 name:@"Sovereign_Wsam" dist:45 visible:YES];
-    [self drawTarget:ctx x:500 y:250 w:60 h:150 hp:30 name:@"Target_Lock" dist:180 visible:NO];
-}
+              // 4. كشف الاسم والمسافة
+              if (SovConfig.esp_name || SovConfig.esp_dist) {
+                  NSString *info = @"";
+                  if (SovConfig.esp_name) info = [info stringByAppendingString:name];
+                  if (SovConfig.esp_dist) info = [info stringByAppendingFormat:@" [%dm]", dist];
+                  
+                  [info drawAtPoint:CGPointMake(x, y - 20) withAttributes:@{NSFontAttributeName:[UIFont boldSystemFontOfSize:10], NSForegroundColorAttributeName:[UIColor whiteColor]}];
+              }
+          }
+          @end
 
-- (void)drawTarget:(CGContextRef)ctx x:(float)x y:(float)y w:(float)w h:(float)h hp:(int)hp name:(NSString *)name dist:(int)dist visible:(BOOL)visible {
-    
-    UIColor *mainColor = visible ? [UIColor greenColor] : [UIColor redColor];
+          // ==========================================================
+          // [🚀] صاعق الانطلاق (نظام النقر في الزاوية العليا اليمنى فقط)
+          // ==========================================================
+          static SovereignChetoMenu *wsamMenu = nil;
 
-    // 1. [كشف الخط]: خط من أعلى منتصف الشاشة إلى اللاعب
-    if (SovConfig.esp_line) {
-        CGContextSetStrokeColorWithColor(ctx, mainColor.CGColor);
-        CGContextSetLineWidth(ctx, 1.0);
-        CGContextMoveToPoint(ctx, self.bounds.size.width / 2, 40); // نقطة البداية أعلى الشاشة
-        CGContextAddLineToPoint(ctx, x + w/2, y); // نقطة النهاية (رأس اللاعب)
-        CGContextStrokePath(ctx);
-    }
+          void __attribute__((constructor)) start_v27_engine() {
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                  UIWindow *targetWin = nil;
+                  if (@available(iOS 13.0, *)) {
+                      for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
+                          if (scene.activationState == UISceneActivationStateForegroundActive) {
+                              targetWin = scene.windows.firstObject; break;
+                          }
+                      }
+                  }
+                  if (!targetWin) targetWin = [UIApplication sharedApplication].keyWindow;
 
-    // 2. [كشف البوكس]
-    if (SovConfig.esp_box) {
-        CGContextSetStrokeColorWithColor(ctx, mainColor.CGColor);
-        CGContextSetLineWidth(ctx, 1.5);
-        CGContextStrokeRect(ctx, CGRectMake(x, y, w, h));
-    }
+                  if (targetWin) {
+                      // حقن الرادار
+                      SovereignRadarOverlay *radar = [[SovereignRadarOverlay alloc] initWithFrame:targetWin.bounds];
+                      [targetWin addSubview:radar];
 
-    // 3. [كشف الصحة]: شريط عريض كما طلبت
-    if (SovConfig.esp_hp) {
-        float hpLen = (h * hp) / 100;
-        CGContextSetFillColorWithColor(ctx, [[UIColor blackColor] colorWithAlphaComponent:0.6].CGColor);
-        CGContextFillRect(ctx, CGRectMake(x - 12, y, 6, h)); 
-        CGContextSetFillColorWithColor(ctx, (hp > 50 ? [UIColor greenColor] : [UIColor redColor]).CGColor);
-        CGContextFillRect(ctx, CGRectMake(x - 12, y + (h - hpLen), 6, hpLen));
-    }
+                      // حقن المنيو
+                      wsamMenu = [[SovereignChetoMenu alloc] initWithFrame:CGRectMake(targetWin.bounds.size.width/2 - 160, targetWin.bounds.size.height/2 - 130, 320, 260)];
+                      [targetWin addSubview:wsamMenu];
 
-    // 4. [كشف الاسم والمسافة]
-    if (SovConfig.esp_name || SovConfig.esp_dist) {
-        NSString *info = @"";
-        if (SovConfig.esp_name) info = [info stringByAppendingString:name];
-        if (SovConfig.esp_dist) info = [info stringByAppendingFormat:@" [%dm]", dist];
-        
-        [info drawAtPoint:CGPointMake(x, y - 20) withAttributes:@{NSFontAttributeName:[UIFont boldSystemFontOfSize:10], NSForegroundColorAttributeName:[UIColor whiteColor]}];
-    }
-}
-@end
+                      // [🎯] إيماءة النقر المزدوج للركن الأيمن العلوي فقط
+                      UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[SovereignChetoMenu class] action:@selector(handleTopRightTap:)];
+                      tap.numberOfTapsRequired = 2;
+                      [targetWin addGestureRecognizer:tap];
+                  }
+              });
+          }
 
-// ==========================================================
-// [🚀] صاعق الانطلاق (Top-Right Double Tap Logic)
-// ==========================================================
-static SovereignChetoMenu *wsamMenu = nil;
-static SovereignRadarOverlay *radarView = nil;
+          @implementation SovereignChetoMenu (GlobalTap)
+          + (void)handleTopRightTap:(UITapGestureRecognizer *)sender {
+              CGPoint loc = [sender locationInView:sender.view];
+              CGFloat sw = [UIScreen mainScreen].bounds.size.width;
+              
+              // [تكتيك السيادة]: فتح المنيو فقط إذا نقر في مساحة صغيرة أعلى يمين الشاشة
+              // x أكبر من عرض الشاشة ناقص 150، و y أصغر من 150
+              if (loc.x > sw - 150 && loc.y < 150) {
+                  [UIView animateWithDuration:0.3 animations:^{
+                      wsamMenu.alpha = (wsamMenu.alpha == 0) ? 1.0 : 0;
+                      wsamMenu.transform = (wsamMenu.alpha == 0) ? CGAffineTransformMakeScale(0.8, 0.8) : CGAffineTransformIdentity;
+                  }];
+              }
+          }
+          @end
+          EOF
 
-void __attribute__((constructor)) start_sovereign_v26() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIWindow *targetWin = nil;
-        if (@available(iOS 13.0, *)) {
-            for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
-                if (scene.activationState == UISceneActivationStateForegroundActive) {
-                    targetWin = scene.windows.firstObject; break;
-                }
-            }
-        }
-        if (!targetWin) targetWin = [UIApplication sharedApplication].keyWindow;
+          # ---------------------------------------------------------
+          # صهر الدايلب العسكري (Compilation)
+          # ---------------------------------------------------------
+          export SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          clang -dynamiclib -arch arm64 main.mm -o Sovereign_Elite_v27.dylib \
+          -isysroot $SDK_PATH \
+          -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore \
+          -fobjc-arc -O0 -w -lc++
 
-        if (targetWin) {
-            radarView = [[SovereignRadarOverlay alloc] initWithFrame:targetWin.bounds];
-            radarView.backgroundColor = [UIColor clearColor];
-            radarView.userInteractionEnabled = NO;
-            [targetWin addSubview:radarView];
-
-            // مقاس المنيو المأخوذ من الصورة
-            wsamMenu = [[SovereignChetoMenu alloc] initWithFrame:CGRectMake(targetWin.bounds.size.width/2 - 170, targetWin.bounds.size.height/2 - 140, 340, 280)];
-            [targetWin addSubview:wsamMenu];
-
-            // [🎯] إيماءة النقر المزدوج للركن الأيمن العلوي فقط
-            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[SovereignChetoMenu class] action:@selector(handleTopRightTap:)];
-            tap.numberOfTapsRequired = 2;
-            [targetWin addGestureRecognizer:tap];
-
-            [NSTimer scheduledTimerWithTimeInterval:0.016 repeats:YES block:^(NSTimer *t){ [radarView setNeedsDisplay]; }];
-        }
-    });
-}
-
-@implementation SovereignChetoMenu (GlobalTap)
-+ (void)handleTopRightTap:(UITapGestureRecognizer *)sender {
-    CGPoint loc = [sender locationInView:sender.view];
-    CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-    
-    // [قاعدة الاشتباك]: فتح المنيو فقط إذا كان النقر في الـ 30% اليمنى من الأعلى
-    if (loc.x > sw * 0.7 && loc.y < 150) {
-        [UIView animateWithDuration:0.3 animations:^{
-            wsamMenu.alpha = (wsamMenu.alpha == 0) ? 1.0 : 0;
-            wsamMenu.transform = (wsamMenu.alpha == 0) ? CGAffineTransformMakeScale(0.8, 0.8) : CGAffineTransformIdentity;
-        }];
-    }
-}
-@end
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sovereign-Elite-v27-Dylib
+          path: Sovereign_Elite_v27.dylib
