@@ -1,4 +1,4 @@
-name: Sovereign-Pro-v37k-RealESP
+name: Sovereign-Pro-v38k-RealESP
 
 on:
   push:
@@ -29,7 +29,6 @@ jobs:
           uintptr_t GWorld_Data_GL = 0x10A4A1960;
           uintptr_t GWorld_Func_GL = 0x102A5125C;
 
-          // أوفستات اللاعب والمصفوفات المليمتريّة
           int ULevelOffset = 0x30;
           int ObjectArrayOffset = 0xA0;
           int ObjectCountOffset = 0xA8;
@@ -37,27 +36,19 @@ jobs:
           int NameOffset = 0x910;
           int HpOffset = 0xdc8;
           int HPMaxOffset = 0xdcc;
-          int bDeadOffset = 0xdec;
-          int isDead = 0xdd4;
-          int MeshOffset = 0x4b8;
-          int HumanOffset = 0x1b0;
           
-          // ==========================================================
-          // [🧬] هياكل التحكم والرياضيات السيادية
-          // ==========================================================
           struct FVector { float X, Y, Z; };
           struct FMatrix { float M[4][4]; };
 
           typedef struct {
-              BOOL master_esp, esp_line, esp_box, esp_skeleton, esp_hp, esp_dist, esp_grenade, esp_name, esp_warning, esp_head;
-              BOOL aim_active, no_recoil, small_crosshair;
-              BOOL magic_bullet, bullet_track, bullet_speed;
-              BOOL loot_weapons, loot_meds, loot_cars;
+              BOOL master_esp, esp_line, esp_box, esp_skeleton, esp_hp, esp_dist, esp_name;
           } SovereignConfig;
 
-          static SovereignConfig SovConfig = {YES, NO, YES, NO, YES, YES, NO, YES, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO};
+          static SovereignConfig SovConfig = {YES, NO, YES, NO, YES, YES, YES};
 
+          // ==========================================================
           // [🛡️] النافذة الذكية (تسمح بمرور اللمس للعبة)
+          // ==========================================================
           @interface PassThroughView : UIView
           @end
           @implementation PassThroughView
@@ -142,9 +133,6 @@ jobs:
               [sender setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
               sender.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
               sender.layer.cornerRadius = 5;
-
-              for (UIView *view in self.contentArea.subviews) [view removeFromSuperview];
-              if (sender.tag == 0) [self.contentArea addSubview:self.radarTab];
           }
 
           - (void)setupRadarTab {
@@ -155,24 +143,20 @@ jobs:
               float btnW = (self.contentArea.frame.size.width - 40) / 3;
               float btnH = 35; float startY = 55;
               
-              [self.radarTab addSubview:[self createButton:@"كشف الخط" frame:CGRectMake(10, startY, btnW, btnH) tag:101]];
-              [self.radarTab addSubview:[self createButton:@"كشف البوكس" frame:CGRectMake(10 + btnW + 10, startY, btnW, btnH) tag:102]];
-              [self.radarTab addSubview:[self createButton:@"كشف العظام" frame:CGRectMake(10 + (btnW+10)*2, startY, btnW, btnH) tag:103]];
+              [self.radarTab addSubview:[self createButton:@"كشف الخط" frame:CGRectMake(10 + (btnW+10)*2, startY, btnW, btnH) tag:101]];
+              [self.radarTab addSubview:[self createButton:@"كشف البوكس" frame:CGRectMake(10 + (btnW+10)*1, startY, btnW, btnH) tag:102]];
+              [self.radarTab addSubview:[self createButton:@"كشف العظام" frame:CGRectMake(10, startY, btnW, btnH) tag:103]];
               
-              [self.radarTab addSubview:[self createButton:@"كشف الصحه" frame:CGRectMake(10, startY + 45, btnW, btnH) tag:106]];
-              [self.radarTab addSubview:[self createButton:@"كشف الاسم" frame:CGRectMake(10 + btnW + 10, startY + 45, btnW, btnH) tag:107]];
-              [self.radarTab addSubview:[self createButton:@"كشف المسافه" frame:CGRectMake(10 + (btnW+10)*2, startY + 45, btnW, btnH) tag:105]];
+              [self.radarTab addSubview:[self createButton:@"كشف الصحه" frame:CGRectMake(10 + (btnW+10)*2, startY + 45, btnW, btnH) tag:106]];
+              [self.radarTab addSubview:[self createButton:@"كشف الاسم" frame:CGRectMake(10 + (btnW+10)*1, startY + 45, btnW, btnH) tag:107]];
+              [self.radarTab addSubview:[self createButton:@"كشف المسافه" frame:CGRectMake(10, startY + 45, btnW, btnH) tag:105]];
               
-              [self addFooterToView:self.radarTab];
-          }
-
-          - (void)addFooterToView:(UIView *)view {
               UILabel *footer = [[UILabel alloc] initWithFrame:CGRectMake(10, self.contentArea.frame.size.height - 25, self.contentArea.frame.size.width - 20, 20)];
-              footer.text = @"WSAM_GEN V37.0 - Real Memory Reader";
+              footer.text = @"WSAM_GEN V38.0 - Top Left Zone";
               footer.textColor = [UIColor grayColor];
               footer.font = [UIFont systemFontOfSize:10];
               footer.textAlignment = NSTextAlignmentRight;
-              [view addSubview:footer];
+              [self.radarTab addSubview:footer];
           }
 
           - (UIButton *)createButton:(NSString *)title frame:(CGRect)frame tag:(int)tag {
@@ -184,19 +168,15 @@ jobs:
               btn.layer.borderWidth = 1.5;
               btn.tag = tag;
               
-              BOOL isActive = [self isFeatureActive:tag];
+              BOOL isActive = NO;
+              if (tag == 200) isActive = SovConfig.master_esp;
+              if (tag == 101) isActive = SovConfig.esp_line;
+              if (tag == 102) isActive = SovConfig.esp_box;
+              if (tag == 106) isActive = SovConfig.esp_hp;
+              
               btn.layer.borderColor = isActive ? [UIColor redColor].CGColor : [UIColor darkGrayColor].CGColor;
               [btn addTarget:self action:@selector(toggleFeature:) forControlEvents:UIControlEventTouchUpInside];
               return btn;
-          }
-
-          - (BOOL)isFeatureActive:(int)tag {
-              switch (tag) {
-                  case 200: return SovConfig.master_esp;
-                  case 101: return SovConfig.esp_line; case 102: return SovConfig.esp_box;
-                  case 106: return SovConfig.esp_hp; case 107: return SovConfig.esp_name; case 105: return SovConfig.esp_dist;
-              }
-              return NO;
           }
 
           - (void)toggleFeature:(UIButton *)sender {
@@ -206,8 +186,6 @@ jobs:
                   case 101: SovConfig.esp_line = !SovConfig.esp_line; isActive = SovConfig.esp_line; break;
                   case 102: SovConfig.esp_box = !SovConfig.esp_box; isActive = SovConfig.esp_box; break;
                   case 106: SovConfig.esp_hp = !SovConfig.esp_hp; isActive = SovConfig.esp_hp; break;
-                  case 107: SovConfig.esp_name = !SovConfig.esp_name; isActive = SovConfig.esp_name; break;
-                  case 105: SovConfig.esp_dist = !SovConfig.esp_dist; isActive = SovConfig.esp_dist; break;
               }
               [UIView animateWithDuration:0.2 animations:^{
                   sender.layer.borderColor = isActive ? [UIColor redColor].CGColor : [UIColor darkGrayColor].CGColor;
@@ -243,8 +221,6 @@ jobs:
                   self.backgroundColor = [UIColor clearColor];
                   self.userInteractionEnabled = NO;
                   self.clearsContextBeforeDrawing = YES;
-                  
-                  // الحصول على عنوان قاعدة اللعبة مليمتر بمليمتر
                   self.baseAddr = _dyld_get_image_vmaddr_slide(0);
                   
                   CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
@@ -253,11 +229,10 @@ jobs:
               return self;
           }
 
-          // دالة مساعدة لقراءة الذاكرة بأمان (Safe Memory Read)
           template <typename T>
-          T readMemory(uintptr_t address) {
+          T readMem(uintptr_t address) {
               T buffer;
-              if (address > 0x100000000) { // تأكد أن العنوان منطقي وليس فارغاً
+              if (address > 0x100000000) { 
                   mach_msg_type_number_t size = sizeof(T);
                   vm_offset_t readMem;
                   if (vm_read(mach_task_self(), address, size, &readMem, &size) == KERN_SUCCESS) {
@@ -274,41 +249,30 @@ jobs:
               if (!SovConfig.master_esp || self.baseAddr == 0) return;
               
               // [تكتيك الصقر]: قراءة النخاع الحي من اللعبة
-              uintptr_t GWorld = readMemory<uintptr_t>(self.baseAddr + GWorld_Data_GL);
+              uintptr_t GWorld = readMem<uintptr_t>(self.baseAddr + GWorld_Data_GL);
               if (!GWorld) return;
               
-              uintptr_t PersistentLevel = readMemory<uintptr_t>(GWorld + ULevelOffset);
+              uintptr_t PersistentLevel = readMem<uintptr_t>(GWorld + ULevelOffset);
               if (!PersistentLevel) return;
               
-              uintptr_t ActorArray = readMemory<uintptr_t>(PersistentLevel + ObjectArrayOffset);
-              int ActorCount = readMemory<int>(PersistentLevel + ObjectCountOffset);
+              uintptr_t ActorArray = readMem<uintptr_t>(PersistentLevel + ObjectArrayOffset);
+              int ActorCount = readMem<int>(PersistentLevel + ObjectCountOffset);
               
-              // حماية من الأعداد الوهمية
               if (!ActorArray || ActorCount <= 0 || ActorCount > 2000) return;
 
-              // حلقة مسح اللاعبين (Entity Loop)
               for (int i = 0; i < ActorCount; i++) {
-                  uintptr_t Actor = readMemory<uintptr_t>(ActorArray + (i * 8)); // كل عنصر 8 بايت في 64-bit
+                  uintptr_t Actor = readMem<uintptr_t>(ActorArray + (i * 8)); 
                   if (!Actor) continue;
                   
-                  // قراءة الصحة للتأكد أن هذا الممثل هو لاعب حي
-                  float hp = readMemory<float>(Actor + HpOffset);
-                  float maxHp = readMemory<float>(Actor + HPMaxOffset);
+                  float hp = readMem<float>(Actor + HpOffset);
                   
                   if (hp > 0 && hp <= 100) { 
-                      
-                      // هنا يجب وضع دالة تحويل الـ WorldToScreen للحصول على x, y, w, h
-                      // ولأغراض حماية الاستقرار، سنرسم اللاعب في مكان تقريبي لاختبار قراءة الذاكرة
-                      
-                      // قراءة الإحداثيات الحقيقية من الماتريكس (سيتم تفعيلها في الإصدار القادم بعد ضبط الكاميرا)
-                      
-                      // رسم تجريبي يثبت قراءة الصحة الحقيقية
+                      // رسم اختباري يثبت قراءة الذاكرة الحقيقية مع الدم العرضي
                       [self drawTarget:ctx x:150 + (i*10) y:300 w:70 h:160 hp:(int)hp name:@"Enemy" dist:45 visible:YES];
                   }
               }
           }
 
-          // دالة الرسم المحدثة (شريط دم عرضي فوق اللاعب)
           - (void)drawTarget:(CGContextRef)ctx x:(float)x y:(float)y w:(float)w h:(float)h hp:(int)hp name:(NSString *)name dist:(int)dist visible:(BOOL)visible {
               UIColor *col = visible ? [UIColor greenColor] : [UIColor redColor];
 
@@ -326,7 +290,7 @@ jobs:
                   CGContextStrokeRect(ctx, CGRectMake(x, y, w, h));
               }
 
-              // شريط الدم العرضي (Horizontal HP Bar)
+              // شريط الدم العرضي (أفقي فوق اللاعب) مليمتر بمليمتر
               if (SovConfig.esp_hp) {
                   float barWidth = w; 
                   float hpW = (barWidth * hp) / 100; 
@@ -338,16 +302,6 @@ jobs:
                   CGContextSetFillColorWithColor(ctx, hpColor.CGColor);
                   CGContextFillRect(ctx, CGRectMake(x, y - 8, hpW, 5));
               }
-              
-              if (SovConfig.esp_name || SovConfig.esp_dist) {
-                  NSString *info = @"";
-                  if (SovConfig.esp_name) info = [info stringByAppendingString:name];
-                  if (SovConfig.esp_dist) info = [info stringByAppendingFormat:@" [%dm]", dist];
-                  
-                  NSDictionary *attr = @{NSFontAttributeName:[UIFont boldSystemFontOfSize:10], NSForegroundColorAttributeName:[UIColor whiteColor]};
-                  CGSize textSize = [info sizeWithAttributes:attr];
-                  [info drawAtPoint:CGPointMake(x + (w/2) - (textSize.width/2), y + h + 5) withAttributes:attr];
-              }
           }
           @end
 
@@ -356,7 +310,7 @@ jobs:
           // ==========================================================
           static SovereignChetoMenu *wsamMenu = nil;
 
-          void start_v37_engine() {
+          void start_v38_engine() {
               UIWindow *targetWin = nil;
               #pragma clang diagnostic push
               #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -374,31 +328,37 @@ jobs:
                   wsamMenu = [[SovereignChetoMenu alloc] initWithFrame:CGRectMake(targetWin.bounds.size.width/2 - 160, targetWin.bounds.size.height/2 - 130, 320, 260)];
                   [mainContainer addSubview:wsamMenu];
 
-                  UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[SovereignChetoMenu class] action:@selector(handleTap:)];
+                  UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[SovereignChetoMenu class] action:@selector(handleTopLeftTap:)];
                   tap.numberOfTapsRequired = 2;
                   [mainContainer addGestureRecognizer:tap];
               }
           }
 
           @implementation SovereignChetoMenu (GlobalTap)
-          + (void)handleTap:(UITapGestureRecognizer *)sender {
-              [UIView animateWithDuration:0.3 animations:^{
-                  wsamMenu.alpha = (wsamMenu.alpha == 0) ? 1.0 : 0;
-                  wsamMenu.transform = (wsamMenu.alpha == 0) ? CGAffineTransformMakeScale(0.8, 0.8) : CGAffineTransformIdentity;
-              }];
+          + (void)handleTopLeftTap:(UITapGestureRecognizer *)sender {
+              CGPoint loc = [sender locationInView:sender.view];
+              
+              // [تكتيك الزاوية اليسرى العليا فقط]: X أقل من 150 و Y أقل من 150
+              if (loc.x < 150 && loc.y < 150) {
+                  [sender.view bringSubviewToFront:wsamMenu]; // إجبار المنيو على الظهور فوق كل شيء
+                  [UIView animateWithDuration:0.3 animations:^{
+                      wsamMenu.alpha = (wsamMenu.alpha == 0) ? 1.0 : 0;
+                      wsamMenu.transform = (wsamMenu.alpha == 0) ? CGAffineTransformMakeScale(0.8, 0.8) : CGAffineTransformIdentity;
+                  }];
+              }
           }
           @end
 
           __attribute__((constructor)) static void setup() {
               dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                  start_v37_engine();
+                  start_v38_engine();
               });
           }
           EOF
 
           # صهر الدايلب
           export SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -dynamiclib -arch arm64 main.mm -o Sovereign_Elite_v37.dylib \
+          clang -dynamiclib -arch arm64 main.mm -o Sovereign_Elite_v38.dylib \
           -isysroot $SDK_PATH \
           -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore \
           -fobjc-arc -O0 -w -lc++
@@ -406,5 +366,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sovereign-Elite-v37-Dylib
-          path: Sovereign_Elite_v37.dylib
+          name: Sovereign-Elite-v38-Dylib
+          path: Sovereign_Elite_v38.dylib
