@@ -29,6 +29,7 @@ jobs:
           #import <objc/runtime.h>
           #include <execinfo.h>
           #include <sys/stat.h>
+          #include <dlfcn.h> // [إضافة سيادية] لسحق خطأ RTLD_DEFAULT
           
           // إعلان وهمي لمكتبة Substrate لكي يقبلها سيرفر GitHub أثناء الصهر
           extern "C" void MSHookFunction(void *symbol, void *replace, void **result);
@@ -185,8 +186,9 @@ jobs:
           // =========================================================
           
           // 1. اختطاف دوال C باستخدام Substrate (رادار الحماية)
-          static int (*orig_stat)(const char *restrict path, struct stat *restrict buf);
-          int sovereign_stat(const char *restrict path, struct stat *restrict buf) {
+          // [سحق خطأ restrict]
+          static int (*orig_stat)(const char *path, struct stat *buf);
+          int sovereign_stat(const char *path, struct stat *buf) {
               if (path) {
                   NSString *pathStr = [NSString stringWithUTF8String:path];
                   // إذا كانت الحماية تفحص ملفات بوبجي أو أنكوس
