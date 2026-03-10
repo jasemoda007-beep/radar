@@ -226,8 +226,8 @@ jobs:
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -dynamiclib -arch arm64 Sovereign_Recon_Terminal.mm -o Sovereign_Recon.dylib \
           -isysroot $SDK_PATH \
-          -framework Foundation -framework UIKit \
-          -fobjc-arc -Os -w
+          -framework Foundation -framework UIKit -framework CoreGraphics \
+          -fobjc-arc -Os -w -lc++
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
