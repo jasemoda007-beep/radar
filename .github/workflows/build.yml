@@ -1,0 +1,425 @@
+name: Sovereign-Pro-v200k-Build
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Sovereign Core
+        run: |
+          cat << 'EOF' > main.mm
+          #import <UIKit/UIKit.h>
+          #import <mach-o/dyld.h>
+          #import <mach/mach.h>
+          #import <Foundation/Foundation.h>
+          #import <QuartzCore/QuartzCore.h>
+
+          // ==========================================================
+          // [🎯] إحداثيات اللعبة - GL 4.2.0
+          // ==========================================================
+          uintptr_t GObject_GL = 0x10A288B80;
+          uintptr_t GName_Func = 0x104C0F1E8;
+          uintptr_t GName_Data = 0x10A0557E0;
+          uintptr_t GWorld_Func = 0x102A5125C;
+          uintptr_t GWorld_Data = 0x10A4A1960;
+
+          // ==========================================================
+          // [🧬] هياكل التحكم السيادية
+          // ==========================================================
+          typedef struct {
+              // الرادار
+              BOOL master_esp, esp_line, esp_box, esp_skeleton, esp_hp, esp_dist, esp_grenade, esp_name, esp_warning, esp_head;
+              // التفعيلات (Aimbot & Recoil)
+              BOOL aim_active, no_recoil, small_crosshair;
+              // بولت
+              BOOL magic_bullet, bullet_track, bullet_speed;
+              // موارد
+              BOOL loot_weapons, loot_meds, loot_cars;
+          } SovereignConfig;
+
+          static SovereignConfig SovConfig = {YES, NO, YES, NO, YES, NO, NO, NO, NO, NO,  // Radar
+                                              NO, NO, NO, // Features
+                                              NO, NO, NO, // Bullet
+                                              NO, NO, NO}; // Loot
+
+          // ==========================================================
+          // [🎨] واجهة الشيتو الاحترافية (Fully Functional Tabs)
+          // ==========================================================
+          @interface SovereignChetoMenu : UIView
+          @property (nonatomic, strong) UIView *contentArea;
+          @property (nonatomic, strong) NSMutableArray *tabButtons;
+          
+          // الحاويات الخاصة بكل تبويب
+          @property (nonatomic, strong) UIView *radarTab;
+          @property (nonatomic, strong) UIView *featuresTab;
+          @property (nonatomic, strong) UIView *bulletTab;
+          @property (nonatomic, strong) UIView *lootTab;
+          @end
+
+          @implementation SovereignChetoMenu
+
+          - (instancetype)initWithFrame:(CGRect)frame {
+              self = [super initWithFrame:frame];
+              if (self) {
+                  self.alpha = 0; 
+                  self.backgroundColor = [[UIColor colorWithRed:0.08 green:0.09 blue:0.13 alpha:0.98] colorWithAlphaComponent:0.98];
+                  self.layer.cornerRadius = 10;
+                  self.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.1].CGColor;
+                  self.layer.borderWidth = 1.0;
+                  self.clipsToBounds = YES;
+
+                  UIView *tabBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 40)];
+                  tabBar.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.08 alpha:1.0];
+                  [self addSubview:tabBar];
+
+                  UIButton *closeBtn = [[UIButton alloc] initWithFrame:CGRectMake(5, 5, 30, 30)];
+                  [closeBtn setTitle:@"X" forState:UIControlStateNormal];
+                  [closeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                  closeBtn.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
+                  closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+                  closeBtn.layer.cornerRadius = 15;
+                  [closeBtn addTarget:self action:@selector(hideMenu) forControlEvents:UIControlEventTouchUpInside];
+                  [tabBar addSubview:closeBtn];
+
+                  NSArray *tabs = @[@"تفعيلات", @"بولت", @"موارد", @"رادار"];
+                  self.tabButtons = [NSMutableArray array];
+                  float tabWidth = (frame.size.width - 45) / 4;
+                  
+                  for (int i = 0; i < tabs.count; i++) {
+                      UIButton *btn = [[UIButton alloc] initWithFrame:CGRectMake(40 + (i * tabWidth), 0, tabWidth, 40)];
+                      [btn setTitle:tabs[i] forState:UIControlStateNormal];
+                      btn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
+                      [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+                      btn.tag = i;
+                      [btn addTarget:self action:@selector(switchTab:) forControlEvents:UIControlEventTouchUpInside];
+                      
+                      if (i == 3) { // رادار هو الافتراضي
+                          [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                          btn.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
+                          btn.layer.cornerRadius = 5;
+                      }
+                      [tabBar addSubview:btn];
+                      [self.tabButtons addObject:btn];
+                  }
+
+                  self.contentArea = [[UIView alloc] initWithFrame:CGRectMake(0, 40, frame.size.width, frame.size.height - 40)];
+                  [self addSubview:self.contentArea];
+
+                  // تهيئة التبويبات مليمتر بمليمتر
+                  [self setupRadarTab];
+                  [self setupFeaturesTab];
+                  [self setupBulletTab];
+                  [self setupLootTab];
+
+                  // إظهار تبويب الرادار افتراضياً
+                  [self.contentArea addSubview:self.radarTab];
+
+                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
+                  [tabBar addGestureRecognizer:pan];
+              }
+              return self;
+          }
+
+          // [تكتيك التبويبات الحية]
+          - (void)switchTab:(UIButton *)sender {
+              // إعادة الألوان للوضع الطبيعي
+              for (UIButton *btn in self.tabButtons) {
+                  [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+                  btn.backgroundColor = [UIColor clearColor];
+              }
+              
+              // تلوين الزر النشط بالأحمر
+              [sender setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+              sender.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.1 alpha:1.0];
+              sender.layer.cornerRadius = 5;
+
+              // مسح المحتوى الحالي
+              for (UIView *view in self.contentArea.subviews) {
+                  [view removeFromSuperview];
+              }
+
+              // إظهار المحتوى الجديد
+              if (sender.tag == 3) [self.contentArea addSubview:self.radarTab];
+              else if (sender.tag == 2) [self.contentArea addSubview:self.lootTab];
+              else if (sender.tag == 1) [self.contentArea addSubview:self.bulletTab];
+              else if (sender.tag == 0) [self.contentArea addSubview:self.featuresTab];
+          }
+
+          // --- بناء صفحات التبويبات ---
+
+          - (void)setupRadarTab {
+              self.radarTab = [[UIView alloc] initWithFrame:self.contentArea.bounds];
+              UIButton *masterBtn = [self createButton:@"تشغيل الكشف" frame:CGRectMake(10, 10, self.contentArea.frame.size.width - 20, 35) tag:200];
+              [self.radarTab addSubview:masterBtn];
+
+              float btnW = (self.contentArea.frame.size.width - 40) / 3;
+              float btnH = 35; float startY = 55;
+              
+              [self.radarTab addSubview:[self createButton:@"كشف الخط" frame:CGRectMake(10 + (btnW+10)*2, startY, btnW, btnH) tag:101]];
+              [self.radarTab addSubview:[self createButton:@"كشف البوكس" frame:CGRectMake(10 + (btnW+10)*1, startY, btnW, btnH) tag:102]];
+              [self.radarTab addSubview:[self createButton:@"كشف العظام" frame:CGRectMake(10, startY, btnW, btnH) tag:103]];
+
+              [self.radarTab addSubview:[self createButton:@"كشف القنابل" frame:CGRectMake(10 + (btnW+10)*2, startY + 45, btnW, btnH) tag:104]];
+              [self.radarTab addSubview:[self createButton:@"كشف المسافه" frame:CGRectMake(10 + (btnW+10)*1, startY + 45, btnW, btnH) tag:105]];
+              [self.radarTab addSubview:[self createButton:@"كشف الصحه" frame:CGRectMake(10, startY + 45, btnW, btnH) tag:106]];
+
+              [self.radarTab addSubview:[self createButton:@"كشف الاسم" frame:CGRectMake(10 + (btnW+10)*2, startY + 90, btnW, btnH) tag:107]];
+              [self.radarTab addSubview:[self createButton:@"التحذير" frame:CGRectMake(10 + (btnW+10)*1, startY + 90, btnW, btnH) tag:108]];
+              [self.radarTab addSubview:[self createButton:@"كشف الرأس" frame:CGRectMake(10, startY + 90, btnW, btnH) tag:109]];
+              [self addFooterToView:self.radarTab];
+          }
+
+          - (void)setupFeaturesTab {
+              self.featuresTab = [[UIView alloc] initWithFrame:self.contentArea.bounds];
+              float btnW = (self.contentArea.frame.size.width - 40) / 2; // عمودين فقط
+              [self.featuresTab addSubview:[self createButton:@"تفعيل الأيمبوت" frame:CGRectMake(10 + btnW + 10, 20, btnW, 40) tag:301]];
+              [self.featuresTab addSubview:[self createButton:@"ثبات السلاح 100%" frame:CGRectMake(10, 20, btnW, 40) tag:302]];
+              [self.featuresTab addSubview:[self createButton:@"تصغير المؤشر" frame:CGRectMake(10 + btnW + 10, 70, btnW, 40) tag:303]];
+              [self addFooterToView:self.featuresTab];
+          }
+
+          - (void)setupBulletTab {
+              self.bulletTab = [[UIView alloc] initWithFrame:self.contentArea.bounds];
+              float btnW = (self.contentArea.frame.size.width - 40) / 2;
+              [self.bulletTab addSubview:[self createButton:@"ماجيك بولت (Magic)" frame:CGRectMake(10 + btnW + 10, 20, btnW, 40) tag:401]];
+              [self.bulletTab addSubview:[self createButton:@"تتبع الرصاص (Track)" frame:CGRectMake(10, 20, btnW, 40) tag:402]];
+              [self.bulletTab addSubview:[self createButton:@"سرعة الرصاص" frame:CGRectMake(10 + btnW + 10, 70, btnW, 40) tag:403]];
+              [self addFooterToView:self.bulletTab];
+          }
+
+          - (void)setupLootTab {
+              self.lootTab = [[UIView alloc] initWithFrame:self.contentArea.bounds];
+              float btnW = (self.contentArea.frame.size.width - 40) / 2;
+              [self.lootTab addSubview:[self createButton:@"رادار الأسلحة" frame:CGRectMake(10 + btnW + 10, 20, btnW, 40) tag:501]];
+              [self.lootTab addSubview:[self createButton:@"رادار العلاج" frame:CGRectMake(10, 20, btnW, 40) tag:502]];
+              [self.lootTab addSubview:[self createButton:@"رادار السيارات" frame:CGRectMake(10 + btnW + 10, 70, btnW, 40) tag:503]];
+              [self addFooterToView:self.lootTab];
+          }
+
+          - (void)addFooterToView:(UIView *)view {
+              UILabel *footer = [[UILabel alloc] initWithFrame:CGRectMake(10, self.contentArea.frame.size.height - 25, self.contentArea.frame.size.width - 20, 20)];
+              footer.text = @"بيانات الكيم - General Wsam";
+              footer.textColor = [UIColor grayColor];
+              footer.font = [UIFont systemFontOfSize:10];
+              footer.textAlignment = NSTextAlignmentRight;
+              [view addSubview:footer];
+          }
+
+          - (UIButton *)createButton:(NSString *)title frame:(CGRect)frame tag:(int)tag {
+              UIButton *btn = [[UIButton alloc] initWithFrame:frame];
+              [btn setTitle:title forState:UIControlStateNormal];
+              btn.titleLabel.font = [UIFont boldSystemFontOfSize:11];
+              btn.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1.0];
+              btn.layer.cornerRadius = 6;
+              btn.layer.borderWidth = 1.5;
+              btn.tag = tag;
+              
+              BOOL isActive = [self isFeatureActive:tag];
+              btn.layer.borderColor = isActive ? [UIColor redColor].CGColor : [UIColor darkGrayColor].CGColor;
+              
+              [btn addTarget:self action:@selector(toggleFeature:) forControlEvents:UIControlEventTouchUpInside];
+              return btn;
+          }
+
+          - (BOOL)isFeatureActive:(int)tag {
+              switch (tag) {
+                  case 200: return SovConfig.master_esp;
+                  case 101: return SovConfig.esp_line; case 102: return SovConfig.esp_box; case 103: return SovConfig.esp_skeleton;
+                  case 104: return SovConfig.esp_grenade; case 105: return SovConfig.esp_dist; case 106: return SovConfig.esp_hp;
+                  case 107: return SovConfig.esp_name; case 108: return SovConfig.esp_warning; case 109: return SovConfig.esp_head;
+                  case 301: return SovConfig.aim_active; case 302: return SovConfig.no_recoil; case 303: return SovConfig.small_crosshair;
+                  case 401: return SovConfig.magic_bullet; case 402: return SovConfig.bullet_track; case 403: return SovConfig.bullet_speed;
+                  case 501: return SovConfig.loot_weapons; case 502: return SovConfig.loot_meds; case 503: return SovConfig.loot_cars;
+              }
+              return NO;
+          }
+
+          - (void)toggleFeature:(UIButton *)sender {
+              BOOL isActive = NO;
+              switch (sender.tag) {
+                  case 200: SovConfig.master_esp = !SovConfig.master_esp; isActive = SovConfig.master_esp; break;
+                  // Radar
+                  case 101: SovConfig.esp_line = !SovConfig.esp_line; isActive = SovConfig.esp_line; break;
+                  case 102: SovConfig.esp_box = !SovConfig.esp_box; isActive = SovConfig.esp_box; break;
+                  case 103: SovConfig.esp_skeleton = !SovConfig.esp_skeleton; isActive = SovConfig.esp_skeleton; break;
+                  case 104: SovConfig.esp_grenade = !SovConfig.esp_grenade; isActive = SovConfig.esp_grenade; break;
+                  case 105: SovConfig.esp_dist = !SovConfig.esp_dist; isActive = SovConfig.esp_dist; break;
+                  case 106: SovConfig.esp_hp = !SovConfig.esp_hp; isActive = SovConfig.esp_hp; break;
+                  case 107: SovConfig.esp_name = !SovConfig.esp_name; isActive = SovConfig.esp_name; break;
+                  case 108: SovConfig.esp_warning = !SovConfig.esp_warning; isActive = SovConfig.esp_warning; break;
+                  case 109: SovConfig.esp_head = !SovConfig.esp_head; isActive = SovConfig.esp_head; break;
+                  // Features
+                  case 301: SovConfig.aim_active = !SovConfig.aim_active; isActive = SovConfig.aim_active; break;
+                  case 302: SovConfig.no_recoil = !SovConfig.no_recoil; isActive = SovConfig.no_recoil; break;
+                  case 303: SovConfig.small_crosshair = !SovConfig.small_crosshair; isActive = SovConfig.small_crosshair; break;
+                  // Bullet
+                  case 401: SovConfig.magic_bullet = !SovConfig.magic_bullet; isActive = SovConfig.magic_bullet; break;
+                  case 402: SovConfig.bullet_track = !SovConfig.bullet_track; isActive = SovConfig.bullet_track; break;
+                  case 403: SovConfig.bullet_speed = !SovConfig.bullet_speed; isActive = SovConfig.bullet_speed; break;
+                  // Loot
+                  case 501: SovConfig.loot_weapons = !SovConfig.loot_weapons; isActive = SovConfig.loot_weapons; break;
+                  case 502: SovConfig.loot_meds = !SovConfig.loot_meds; isActive = SovConfig.loot_meds; break;
+                  case 503: SovConfig.loot_cars = !SovConfig.loot_cars; isActive = SovConfig.loot_cars; break;
+              }
+
+              [UIView animateWithDuration:0.2 animations:^{
+                  sender.layer.borderColor = isActive ? [UIColor redColor].CGColor : [UIColor darkGrayColor].CGColor;
+              }];
+              UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+              [gen impactOccurred];
+          }
+
+          - (void)hideMenu {
+              [UIView animateWithDuration:0.3 animations:^{
+                  self.alpha = 0;
+                  self.transform = CGAffineTransformMakeScale(0.8, 0.8);
+              }];
+          }
+
+          - (void)handleDrag:(UIPanGestureRecognizer *)p {
+              CGPoint t = [p translationInView:self.superview];
+              self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
+              [p setTranslation:CGPointZero inView:self.superview];
+          }
+          @end
+
+          // ==========================================================
+          // [👁️] محرك الرادار (Clean Overlay Rendering)
+          // ==========================================================
+          @interface SovereignRadarOverlay : UIView
+          @end
+
+          @implementation SovereignRadarOverlay
+          
+          - (instancetype)initWithFrame:(CGRect)frame {
+              self = [super initWithFrame:frame];
+              if (self) {
+                  self.backgroundColor = [UIColor clearColor];
+                  self.userInteractionEnabled = NO;
+                  
+                  // [تكتيك التطهير]: التأكد من مسح الشاشة في كل إطار لمنع "تعليق" الرسومات
+                  self.clearsContextBeforeDrawing = YES; 
+                  
+                  CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
+                  [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+              }
+              return self;
+          }
+
+          - (void)drawRect:(CGRect)rect {
+              // هذا السطر يمسح الشاشة من الرسومات السابقة (سحق التعليق)
+              CGContextRef ctx = UIGraphicsGetCurrentContext();
+              CGContextClearRect(ctx, rect);
+
+              if (!SovConfig.master_esp) return;
+              
+              // [تكتيك استهداف الشادو حصراً]
+              uintptr_t shadowBase = 0;
+              uint32_t count = _dyld_image_count();
+              for (uint32_t i = 0; i < count; i++) {
+                  const char *name = _dyld_get_image_name(i);
+                  if (name && strstr(name, "ShadowTrackerExtra")) {
+                      shadowBase = _dyld_get_image_vmaddr_slide(i);
+                      break;
+                  }
+              }
+
+              if (shadowBase == 0) return; // فشل العثور على اللعبة
+
+              // [محاكاة رصد الأعداء للتجربة البصرية]
+              // في النسخة القادمة سنستبدل هذا بقراءة مصفوفة اللاعبين من الذاكرة
+              [self drawTarget:ctx x:200 y:400 w:70 h:160 hp:90 name:@"WSAM_GEN" dist:45 visible:YES];
+          }
+
+          - (void)drawTarget:(CGContextRef)ctx x:(float)x y:(float)y w:(float)w h:(float)h hp:(int)hp name:(NSString *)name dist:(int)dist visible:(BOOL)visible {
+              UIColor *col = visible ? [UIColor greenColor] : [UIColor redColor];
+
+              if (SovConfig.esp_line) {
+                  CGContextSetStrokeColorWithColor(ctx, col.CGColor);
+                  CGContextSetLineWidth(ctx, 1.0);
+                  CGContextMoveToPoint(ctx, self.bounds.size.width / 2, 40); 
+                  CGContextAddLineToPoint(ctx, x + w/2, y); 
+                  CGContextStrokePath(ctx);
+              }
+
+              if (SovConfig.esp_box) {
+                  CGContextSetStrokeColorWithColor(ctx, col.CGColor);
+                  CGContextSetLineWidth(ctx, 1.5);
+                  CGContextStrokeRect(ctx, CGRectMake(x, y, w, h));
+              }
+
+              if (SovConfig.esp_hp) {
+                  float hpL = (h * hp) / 100;
+                  CGContextSetFillColorWithColor(ctx, [[UIColor blackColor] colorWithAlphaComponent:0.6].CGColor);
+                  CGContextFillRect(ctx, CGRectMake(x-10, y, 6, h));
+                  CGContextSetFillColorWithColor(ctx, [UIColor yellowColor].CGColor);
+                  CGContextFillRect(ctx, CGRectMake(x-10, y+(h-hpL), 6, hpL));
+              }
+          }
+          @end
+
+          // ==========================================================
+          // [🚀] صاعق الانطلاق (نظام النقر في الزاوية العليا اليمنى)
+          // ==========================================================
+          static SovereignChetoMenu *wsamMenu = nil;
+
+          void __attribute__((constructor)) start_v29_engine() {
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                  UIWindow *targetWin = nil;
+                  if (@available(iOS 13.0, *)) {
+                      for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
+                          if (scene.activationState == UISceneActivationStateForegroundActive) {
+                              targetWin = scene.windows.firstObject; break;
+                          }
+                      }
+                  }
+                  if (!targetWin) targetWin = [UIApplication sharedApplication].keyWindow;
+
+                  if (targetWin) {
+                      SovereignRadarOverlay *radar = [[SovereignRadarOverlay alloc] initWithFrame:targetWin.bounds];
+                      [targetWin addSubview:radar];
+
+                      wsamMenu = [[SovereignChetoMenu alloc] initWithFrame:CGRectMake(targetWin.bounds.size.width/2 - 160, targetWin.bounds.size.height/2 - 130, 320, 260)];
+                      [targetWin addSubview:wsamMenu];
+
+                      UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[SovereignChetoMenu class] action:@selector(handleTopRightTap:)];
+                      tap.numberOfTapsRequired = 2;
+                      [targetWin addGestureRecognizer:tap];
+                  }
+              });
+          }
+
+          @implementation SovereignChetoMenu (GlobalTap)
+          + (void)handleTopRightTap:(UITapGestureRecognizer *)sender {
+              CGPoint loc = [sender locationInView:sender.view];
+              CGFloat sw = [UIScreen mainScreen].bounds.size.width;
+              
+              if (loc.x > sw - 150 && loc.y < 150) {
+                  [UIView animateWithDuration:0.3 animations:^{
+                      wsamMenu.alpha = (wsamMenu.alpha == 0) ? 1.0 : 0;
+                      wsamMenu.transform = (wsamMenu.alpha == 0) ? CGAffineTransformMakeScale(0.8, 0.8) : CGAffineTransformIdentity;
+                  }];
+              }
+          }
+          @end
+          EOF
+
+          # صهر الدايلب بدون تحسينات لضمان الحجم (-O0)
+          export SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          clang -dynamiclib -arch arm64 main.mm -o Sovereign_Elite_v29.dylib \
+          -isysroot $SDK_PATH \
+          -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore \
+          -fobjc-arc -O0 -w -lc++
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sovereign-Elite-v29-Dylib
+          path: Sovereign_Elite_v29.dylib
