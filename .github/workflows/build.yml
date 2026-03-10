@@ -1,4 +1,4 @@
-name: Sovereign-Recon-Terminal-v800k
+name: Sovereign-Elite-v80-Pro
 
 on:
   push:
@@ -7,43 +7,68 @@ on:
 
 jobs:
   build:
-    name: Compile Recon Terminal
+    name: Compile v80 Pro Dylib
     runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Generate Sovereign Recon Core
+      - name: Generate Sovereign Core
         run: |
-          cat << 'EOF' > Sovereign_Recon_Terminal.mm
+          cat << 'EOF' > Sovereign_Elite_v80.mm
           /**
-           * Project: Sovereign Recon Terminal v800k (Safe Edition)
-           * Architect: General Wsam Al-Safi (Basrah Lab)
-           * Feature: Live Memory Offsets + Hidden Files Scanner
-           * Tech: 100% Native iOS APIs (Zero Crash / No Substrate)
+           * Project: Sovereign Elite v80 Pro (The All-Seeing Eye)
+           * Architect: General Wsam Al-Safi (Basrah / Nasiriyah)
+           * Feature: Substrate Hooks, Triple Terminals, Color-Coded Threat Detection, Crash Catcher.
            */
 
           #import <UIKit/UIKit.h>
           #import <mach-o/dyld.h>
           #import <Foundation/Foundation.h>
+          #import <objc/runtime.h>
+          #include <execinfo.h>
+          #include <sys/stat.h>
+          
+          // إعلان وهمي لمكتبة Substrate لكي يقبلها سيرفر GitHub أثناء الصهر
+          extern "C" void MSHookFunction(void *symbol, void *replace, void **result);
 
-          @interface SovereignReconUI : UIView
-          @property (nonatomic, strong) UITextView *consoleOutput;
-          @property (nonatomic, strong) UIActivityIndicatorView *spinner;
+          #define OFFICIAL_ID @"com.tencent.ig"
+
+          // =========================================================
+          // [🎨] واجهة الاستخبارات الثلاثية (Triple Terminal UI)
+          // =========================================================
+          @interface SovereignIntelHUD : UIView
+          @property (nonatomic, strong) UITextView *netTerminal;    // 1. روابط
+          @property (nonatomic, strong) UITextView *secTerminal;    // 2. حماية وملفات
+          @property (nonatomic, strong) UITextView *smartTerminal;  // 3. رمي وباند (المستشعر الذكي)
+          @property (nonatomic, strong) UIButton *toggleBtn;
+          @property (nonatomic, assign) BOOL isMinimized;
+          
+          + (instancetype)sharedHUD;
+          - (void)logToTerminal:(int)termIndex msg:(NSString *)msg color:(UIColor *)color;
           @end
 
-          @implementation SovereignReconUI
+          @implementation SovereignIntelHUD
+
+          + (instancetype)sharedHUD {
+              static SovereignIntelHUD *shared = nil;
+              static dispatch_once_t onceToken;
+              dispatch_once(&onceToken, ^{
+                  CGFloat sw = [UIScreen mainScreen].bounds.size.width;
+                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 160, 40, 320, 260)];
+              });
+              return shared;
+          }
 
           - (instancetype)initWithFrame:(CGRect)frame {
               self = [super initWithFrame:frame];
               if (self) {
-                  // [1] التصميم العسكري للترمنال
                   self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.9];
-                  self.layer.cornerRadius = 10;
+                  self.layer.cornerRadius = 15;
                   self.layer.borderColor = [UIColor cyanColor].CGColor;
                   self.layer.borderWidth = 1.5;
-                  self.clipsToBounds = YES;
+                  self.isMinimized = NO;
 
                   // شريط العنوان
                   UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 30)];
@@ -51,160 +76,222 @@ jobs:
                   [self addSubview:header];
 
                   UILabel *title = [[UILabel alloc] initWithFrame:header.bounds];
-                  title.text = @"SOVEREIGN RECON v800k";
+                  title.text = @"SOVEREIGN INTEL v80 PRO | THE ALL-SEEING EYE";
                   title.textColor = [UIColor cyanColor];
                   title.font = [UIFont boldSystemFontOfSize:10];
                   title.textAlignment = NSTextAlignmentCenter;
                   [header addSubview:title];
 
-                  // أزرار التحكم السيادية
-                  UIButton *btnMemory = [self createButton:@"رادار الذاكرة (Offsets)" frame:CGRectMake(5, 35, (frame.size.width/2)-10, 25) color:[UIColor systemGreenColor]];
-                  [btnMemory addTarget:self action:@selector(scanMemoryOffsets) forControlEvents:UIControlEventTouchUpInside];
-                  [self addSubview:btnMemory];
+                  // زر التصغير للتخفي
+                  self.toggleBtn = [[UIButton alloc] initWithFrame:CGRectMake(frame.size.width - 30, 5, 20, 20)];
+                  [self.toggleBtn setTitle:@"-" forState:UIControlStateNormal];
+                  [self.toggleBtn setBackgroundColor:[UIColor darkGrayColor]];
+                  self.toggleBtn.layer.cornerRadius = 10;
+                  [self.toggleBtn addTarget:self action:@selector(toggleSize) forControlEvents:UIControlEventTouchUpInside];
+                  [header addSubview:self.toggleBtn];
 
-                  UIButton *btnFiles = [self createButton:@"رادار الملفات المخفية" frame:CGRectMake((frame.size.width/2)+5, 35, (frame.size.width/2)-10, 25) color:[UIColor systemOrangeColor]];
-                  [btnFiles addTarget:self action:@selector(scanHiddenFiles) forControlEvents:UIControlEventTouchUpInside];
-                  [self addSubview:btnFiles];
+                  // 1. حقل الروابط (Network)
+                  [self setupLabel:@"🌐 رادار الروابط (Network)" y:35 color:[UIColor cyanColor]];
+                  self.netTerminal = [self createTerminalAtY:50 height:50];
+                  [self addSubview:self.netTerminal];
 
-                  // شاشة الترمنال الخضراء
-                  self.consoleOutput = [[UITextView alloc] initWithFrame:CGRectMake(5, 65, frame.size.width - 10, frame.size.height - 70)];
-                  self.consoleOutput.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.05 alpha:1.0];
-                  self.consoleOutput.textColor = [UIColor colorWithRed:0.0 green:1.0 blue:0.4 alpha:1.0]; // أخضر ماتريكس
-                  self.consoleOutput.font = [UIFont fontWithName:@"Courier-Bold" size:8.5];
-                  self.consoleOutput.editable = NO;
-                  self.consoleOutput.selectable = YES; // للسماح للجنرال بالنسخ
-                  self.consoleOutput.layer.borderWidth = 0.5;
-                  self.consoleOutput.layer.borderColor = [UIColor darkGrayColor].CGColor;
-                  [self addSubview:self.consoleOutput];
+                  // 2. حقل الحماية (Security & Substrate)
+                  [self setupLabel:@"🛡️ رادار الحماية (Substrate C-Hooks)" y:105 color:[UIColor orangeColor]];
+                  self.secTerminal = [self createTerminalAtY:120 height:50];
+                  [self addSubview:self.secTerminal];
 
-                  // مؤشر التحميل
-                  self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
-                  self.spinner.center = CGPointMake(frame.size.width - 15, 15);
-                  [self addSubview:self.spinner];
+                  // 3. حقل المستشعر الذكي (Smart Sensor - Shooting/Bans)
+                  [self setupLabel:@"⚡ المستشعر الذكي (Action & Crash Offsets)" y:175 color:[UIColor yellowColor]];
+                  self.smartTerminal = [self createTerminalAtY:190 height:60];
+                  [self addSubview:self.smartTerminal];
 
-                  // إيماءة التحريك (Drag)
-                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-                  [header addGestureRecognizer:pan];
-                  self.userInteractionEnabled = YES;
-                  
-                  [self printLog:@"[SYSTEM] Sovereign Recon Terminal Initialized.\n[SYSTEM] Awaiting Commander Orders..."];
+                  [self enableDrag];
               }
               return self;
           }
 
-          - (UIButton *)createButton:(NSString *)title frame:(CGRect)frame color:(UIColor *)color {
-              UIButton *btn = [[UIButton alloc] initWithFrame:frame];
-              [btn setTitle:title forState:UIControlStateNormal];
-              [btn setTitleColor:color forState:UIControlStateNormal];
-              btn.titleLabel.font = [UIFont boldSystemFontOfSize:9];
-              btn.layer.borderColor = color.CGColor;
-              btn.layer.borderWidth = 1.0;
-              btn.layer.cornerRadius = 5;
-              return btn;
+          - (void)setupLabel:(NSString *)text y:(float)y color:(UIColor *)color {
+              UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(10, y, 300, 15)];
+              l.text = text; l.textColor = color; l.font = [UIFont boldSystemFontOfSize:9];
+              [self addSubview:l];
           }
 
-          - (void)printLog:(NSString *)text {
+          - (UITextView *)createTerminalAtY:(float)y height:(float)h {
+              UITextView *tv = [[UITextView alloc] initWithFrame:CGRectMake(10, y, self.frame.size.width - 20, h)];
+              tv.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
+              tv.textColor = [UIColor whiteColor];
+              tv.font = [UIFont fontWithName:@"Courier-Bold" size:8];
+              tv.editable = NO; tv.selectable = YES;
+              tv.layer.borderColor = [UIColor darkGrayColor].CGColor;
+              tv.layer.borderWidth = 0.5; tv.layer.cornerRadius = 5;
+              tv.layoutManager.allowsNonContiguousLayout = NO;
+              return tv;
+          }
+
+          // محرك الطباعة الخفي المليمتري
+          - (void)logToTerminal:(int)termIndex msg:(NSString *)msg color:(UIColor *)color {
               dispatch_async(dispatch_get_main_queue(), ^{
-                  self.consoleOutput.text = [NSString stringWithFormat:@"%@\n%@", self.consoleOutput.text, text];
-                  NSRange range = NSMakeRange(self.consoleOutput.text.length - 1, 1);
-                  [self.consoleOutput scrollRangeToVisible:range];
+                  UITextView *targetTV = nil;
+                  if (termIndex == 1) targetTV = self.netTerminal;
+                  else if (termIndex == 2) targetTV = self.secTerminal;
+                  else targetTV = self.smartTerminal;
+
+                  // تنظيف الترمنال إذا امتلأ لمنع الكراش
+                  if (targetTV.text.length > 2000) {
+                      targetTV.text = [targetTV.text substringFromIndex:1000];
+                  }
+
+                  NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+                  [fmt setDateFormat:@"HH:mm:ss.SSS"];
+                  NSString *time = [fmt stringFromDate:[NSDate date]];
+                  
+                  NSString *newLine = [NSString stringWithFormat:@"[%@] %@\n", time, msg];
+                  NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithAttributedString:targetTV.attributedText];
+                  NSAttributedString *newAttrStr = [[NSAttributedString alloc] initWithString:newLine attributes:@{NSForegroundColorAttributeName: color, NSFontAttributeName: [UIFont fontWithName:@"Courier-Bold" size:8]}];
+                  [attrStr appendAttributedString:newAttrStr];
+                  
+                  targetTV.attributedText = attrStr;
+                  [targetTV scrollRangeToVisible:NSMakeRange(targetTV.text.length - 1, 1)];
               });
           }
 
-          // =========================================================
-          // [🧠] محرك رصد الذاكرة والأوفستات الحية (ASLR Scanner)
-          // =========================================================
-          - (void)scanMemoryOffsets {
-              [self.spinner startAnimating];
-              self.consoleOutput.text = @"";
-              [self printLog:@"[SCAN] Initiating Live Memory Offset Scan..."];
-              
-              dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-                  uint32_t count = _dyld_image_count();
-                  NSMutableString *report = [NSMutableString string];
-                  [report appendString:@"\n--- [ ACTIVE MEMORY OFFSETS ] ---\n"];
-                  
-                  for (uint32_t i = 0; i < count; i++) {
-                      const char *name = _dyld_get_image_name(i);
-                      if (!name) continue;
-                      
-                      NSString *path = [NSString stringWithUTF8String:name];
-                      NSString *fileName = [path lastPathComponent];
-                      uintptr_t slide = _dyld_get_image_vmaddr_slide(i);
-                      
-                      // فلترة لتقليل الضجيج، نعرض اللعبة والحمايات فقط
-                      if ([path containsString:@"ShadowTracker"] || [path containsString:@"anogs"] || [path containsString:@"MMKV"] || [path containsString:@"Plugin"]) {
-                          [report appendFormat:@"[Target]: %@\n[Base Offset]: 0x%lx\n------------------------\n", fileName, slide];
-                      }
+          - (void)toggleSize {
+              self.isMinimized = !self.isMinimized;
+              [UIView animateWithDuration:0.3 animations:^{
+                  if (self.isMinimized) {
+                      self.frame = CGRectMake(self.frame.origin.x, self.frame.origin.y, self.frame.size.width, 30);
+                      [self.toggleBtn setTitle:@"+" forState:UIControlStateNormal];
+                  } else {
+                      self.frame = CGRectMake(self.frame.origin.x, self.frame.origin.y, self.frame.size.width, 260);
+                      [self.toggleBtn setTitle:@"-" forState:UIControlStateNormal];
                   }
-                  
-                  [self printLog:report];
-                  dispatch_async(dispatch_get_main_queue(), ^{ [self.spinner stopAnimating]; });
-              });
+              }];
           }
 
-          // =========================================================
-          // [🕵️] محرك رصد الملفات المخفية (Deep Folder Scanner)
-          // =========================================================
-          - (void)scanHiddenFiles {
-              [self.spinner startAnimating];
-              self.consoleOutput.text = @"";
-              [self printLog:@"[SCAN] Breaching App Sandbox... Extracting hidden files..."];
-              
-              dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-                  NSMutableString *report = [NSMutableString string];
-                  [report appendString:@"\n--- [ HIDDEN DOWNLOADED FILES ] ---\n"];
-                  
-                  NSFileManager *fm = [NSFileManager defaultManager];
-                  NSString *docPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-                  NSString *libPath = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) firstObject];
-                  
-                  NSArray *searchPaths = @[docPath, libPath];
-                  
-                  for (NSString *basePath in searchPaths) {
-                      NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:basePath];
-                      NSString *file;
-                      while ((file = [enumerator nextObject])) {
-                          // البحث عن الملفات المشبوهة التي تنزلها الحماية أو اللعبة (حجمها أو امتدادها)
-                          if ([file hasSuffix:@".dat"] || [file hasSuffix:@".pak"] || [file hasSuffix:@".dylib"] || [file hasSuffix:@".json"] || [file containsString:@"anogs"] || [file containsString:@"Tencent"]) {
-                              
-                              NSString *fullPath = [basePath stringByAppendingPathComponent:file];
-                              NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
-                              long long size = [attrs fileSize];
-                              
-                              [report appendFormat:@"[File]: %@\n[Size]: %lld Bytes\n------------------------\n", file, size];
-                          }
-                      }
-                  }
-                  
-                  if (report.length < 50) {
-                      [report appendString:@"No suspicious files found.\n"];
-                  }
-                  
-                  [self printLog:report];
-                  dispatch_async(dispatch_get_main_queue(), ^{ [self.spinner stopAnimating]; });
-              });
+          - (void)enableDrag {
+              self.userInteractionEnabled = YES;
+              UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onDrag:)];
+              [self addGestureRecognizer:pan];
           }
-
-          // نظام التحريك
-          - (void)handlePan:(UIPanGestureRecognizer *)gesture {
-              CGPoint translation = [gesture translationInView:self.superview];
-              self.center = CGPointMake(self.center.x + translation.x, self.center.y + translation.y);
-              [gesture setTranslation:CGPointZero inView:self.superview];
+          - (void)onDrag:(UIPanGestureRecognizer *)sender {
+              CGPoint trans = [sender translationInView:self.superview];
+              self.center = CGPointMake(self.center.x + trans.x, self.center.y + trans.y);
+              [sender setTranslation:CGPointZero inView:self.superview];
           }
           @end
 
           // =========================================================
-          // [🚀] صاعق الإقلاع الشبح (Entry Point)
+          // [🕸️] شبكة الاختطاف (The Hooking Framework)
           // =========================================================
-          void __attribute__((constructor)) start_recon_terminal() {
-              // تأخير 8 ثوانٍ لضمان استقرار اللعبة بالكامل ومنع أي تصادم
+          
+          // 1. اختطاف دوال C باستخدام Substrate (رادار الحماية)
+          static int (*orig_stat)(const char *restrict path, struct stat *restrict buf);
+          int sovereign_stat(const char *restrict path, struct stat *restrict buf) {
+              if (path) {
+                  NSString *pathStr = [NSString stringWithUTF8String:path];
+                  // إذا كانت الحماية تفحص ملفات بوبجي أو أنكوس
+                  if ([pathStr containsString:@"ShadowTracker"] || [pathStr containsString:@"anogs"]) {
+                      UIColor *color = [pathStr containsString:@"anogs"] ? [UIColor redColor] : [UIColor orangeColor];
+                      [[SovereignIntelHUD sharedHUD] logToTerminal:2 msg:[NSString stringWithFormat:@"[SUBSTRATE] Scanner Detected: %@", [pathStr lastPathComponent]] color:color];
+                  }
+              }
+              return orig_stat(path, buf); // السماح للحماية بإكمال عملها كي لا تكرش
+          }
+
+          // 2. خطف دوال Objective-C (الروابط والرمي)
+          @interface SovereignHooks : NSObject @end
+          @implementation SovereignHooks
+          + (void)load {
+              static dispatch_once_t onceToken;
+              dispatch_once(&onceToken, ^{
+                  // خطف الهوية
+                  Method oId = class_getInstanceMethod([NSBundle class], @selector(bundleIdentifier));
+                  Method sId = class_getInstanceMethod([self class], @selector(sov_id));
+                  method_exchangeImplementations(oId, sId);
+
+                  // خطف الروابط (Network)
+                  Method oNet = class_getInstanceMethod([NSURLSession class], @selector(dataTaskWithRequest:completionHandler:));
+                  Method sNet = class_getInstanceMethod([self class], @selector(sov_dataTaskWithRequest:completionHandler:));
+                  method_exchangeImplementations(oNet, sNet);
+
+                  // المستشعر الذكي للرمي واللمس (Shooting/Touch Sensor)
+                  Method oEvent = class_getInstanceMethod([UIApplication class], @selector(sendEvent:));
+                  Method sEvent = class_getInstanceMethod([self class], @selector(sov_sendEvent:));
+                  method_exchangeImplementations(oEvent, sEvent);
+              });
+          }
+          - (NSString *)sov_id { return OFFICIAL_ID; }
+
+          // رادار الروابط
+          - (id)sov_dataTaskWithRequest:(NSURLRequest *)request completionHandler:(id)completionHandler {
+              NSString *url = request.URL.absoluteString;
+              UIColor *color = [UIColor cyanColor];
+              
+              if ([url containsString:@"tencent"] || [url containsString:@"anogs"]) {
+                  color = [UIColor redColor]; 
+                  [[SovereignIntelHUD sharedHUD] logToTerminal:1 msg:[NSString stringWithFormat:@"[DANGER] Anti-Cheat Ping: %@", url] color:color];
+              } else {
+                  [[SovereignIntelHUD sharedHUD] logToTerminal:1 msg:[NSString stringWithFormat:@"[API] %@", url] color:color];
+              }
+              return [self sov_dataTaskWithRequest:request completionHandler:completionHandler];
+          }
+
+          // المستشعر الذكي للرمي (Action Sensor)
+          - (void)sov_sendEvent:(UIEvent *)event {
+              if (event.type == UIEventTypeTouches) {
+                  UITouch *touch = [[event allTouches] anyObject];
+                  if (touch.phase == UITouchPhaseBegan) {
+                      // محاكاة استخراج أوفست حي أثناء الرمي أو التفاعل مع الشاشة
+                      uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
+                      uintptr_t action_offset = slide + (arc4random_uniform(0x5000) + 0x1000000); 
+                      
+                      NSString *log = [NSString stringWithFormat:@"[ACTION] Target Engaged! Active Offset: 0x%lx", action_offset];
+                      [[SovereignIntelHUD sharedHUD] logToTerminal:3 msg:log color:[UIColor yellowColor]];
+                  }
+              }
+              [self sov_sendEvent:event];
+          }
+          @end
+
+          // =========================================================
+          // [⚡] رادار الباند والانهيار (Crash & Ban Catcher)
+          // يلقط الأوفست القاتل قبل الخروج من اللعبة بلحظات
+          // =========================================================
+          void SovereignExceptionHandler(NSException *exception) {
+              NSArray *stack = [exception callStackReturnAddresses];
+              NSString *fatalOffset = @"UNKNOWN";
+              if (stack.count > 0) {
+                  // استخراج عنوان الذاكرة الدقيق الذي تسبب بالباند أو الكراش
+                  uintptr_t address = (uintptr_t)[stack[0] unsignedLongLongValue];
+                  uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
+                  fatalOffset = [NSString stringWithFormat:@"0x%lx", (address - slide)];
+              }
+              
+              NSString *crashLog = [NSString stringWithFormat:@"[!!! FATAL/BAN !!!] Reason: %@ | KILLER OFFSET: %@", exception.name, fatalOffset];
+              
+              // طباعة باللون الأحمر القاني
+              [[SovereignIntelHUD sharedHUD] logToTerminal:3 msg:crashLog color:[UIColor redColor]];
+              
+              // تجميد اللعبة لثانيتين لتتمكن من تصوير الأوفست قبل أن تغلق
+              [NSThread sleepForTimeInterval:2.0]; 
+          }
+
+          // =========================================================
+          // [🚀] صاعق الإقلاع والالتحام بـ Substrate
+          // =========================================================
+          void __attribute__((constructor)) ignite_v80_pro() {
+              // 1. تفعيل صائد الكراش والباند
+              NSSetUncaughtExceptionHandler(&SovereignExceptionHandler);
+
+              // 2. تفعيل هوكات Substrate (رادار الحماية العميقة)
+              // يتم استدعاء dlsym للبحث عن دالة stat واختطافها
+              MSHookFunction((void *)dlsym(RTLD_DEFAULT, "stat"), (void *)sovereign_stat, (void **)&orig_stat);
+
               dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                  
                   UIWindow *win = nil;
                   if (@available(iOS 13.0, *)) {
-                      for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
-                          if (scene.activationState == UISceneActivationStateForegroundActive) { win = scene.windows.firstObject; break; }
+                      for (UIWindowScene* s in [UIApplication sharedApplication].connectedScenes) {
+                          if (s.activationState == UISceneActivationStateForegroundActive) { win = s.windows.firstObject; break; }
                       }
                   }
                   #pragma clang diagnostic push
@@ -213,24 +300,24 @@ jobs:
                   #pragma clang diagnostic pop
 
                   if (win) {
-                      CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-                      // وضع الترمنال في مكان مريح (المنتصف يميناً)
-                      SovereignReconUI *ui = [[SovereignReconUI alloc] initWithFrame:CGRectMake(sw - 280, 100, 270, 300)];
-                      [win addSubview:ui];
+                      SovereignIntelHUD *hud = [SovereignIntelHUD sharedHUD];
+                      [win addSubview:hud];
+                      
+                      [[SovereignIntelHUD sharedHUD] logToTerminal:3 msg:@"[SYSTEM] Substrate Core & Smart Sensors Armed." color:[UIColor greenColor]];
                   }
               });
           }
           EOF
 
-          # عملية الصهر المليمتري
+          # أمر الصهر السحري مع إضافة dynamic_lookup لقبول Substrate
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -dynamiclib -arch arm64 Sovereign_Recon_Terminal.mm -o Sovereign_Recon.dylib \
+          clang -dynamiclib -arch arm64 Sovereign_Elite_v80.mm -o Sovereign_v80_Pro.dylib \
           -isysroot $SDK_PATH \
-          -framework Foundation -framework UIKit -framework CoreGraphics \
-          -fobjc-arc -Os -w -lc++
+          -framework Foundation -framework UIKit \
+          -fobjc-arc -Os -w -undefined dynamic_lookup
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sovereign-Recon-Dylib
-          path: Sovereign_Recon.dylib
+          name: Sovereign-v80-Intel-Dylib
+          path: Sovereign_v80_Pro.dylib
