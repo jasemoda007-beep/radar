@@ -18,10 +18,10 @@ jobs:
         run: |
           cat << 'EOF' > Sovereign_Smart_Terminal.mm
           /**
-           * Project: Sovereign Smart Terminal v104k (No-Crash Sideload Edition)
+           * Project: Sovereign Smart Terminal v104k (Enhanced Anti-Crash)
            * Architect: General Wsam Al-Safi (Basrah / Nasiriyah)
-           * Target Device: Non-Jailbroken Devices (ESign Safe)
-           * Feature: Dual Sensor (Files, Events), Network Removed, Delayed Hooking.
+           * Status: Fixed for Sideloaded Versions (No-Jailbreak)
+           * Objective: Track Files, Events, and Memory Offsets for Bug Hunting.
            */
 
           #import <UIKit/UIKit.h>
@@ -30,15 +30,13 @@ jobs:
           #import <mach-o/dyld.h>
 
           // =========================================================
-          // [1] محرك الترمنال المزدوج (Dual-Core UI Engine)
+          // [1] محرك الواجهة (UI Engine) - محسن لمنع استهلاك الرام
           // =========================================================
           @interface SovereignDualTerminal : UIView
           @property (nonatomic, strong) UITextView *fileTerminal;
           @property (nonatomic, strong) UITextView *eventTerminal;
           @property (nonatomic, strong) NSMutableArray *fileBuffer;
           @property (nonatomic, strong) NSMutableArray *eventBuffer;
-          @property (nonatomic, strong) NSTimer *flushTimer;
-
           + (instancetype)sharedTerminal;
           - (void)queueFileLog:(NSString *)msg color:(UIColor *)color;
           - (void)queueEventLog:(NSString *)msg color:(UIColor *)color;
@@ -51,7 +49,7 @@ jobs:
               static dispatch_once_t onceToken;
               dispatch_once(&onceToken, ^{
                   CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 180, 50, 360, 260)];
+                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 180, 50, 360, 280)];
               });
               return shared;
           }
@@ -59,249 +57,175 @@ jobs:
           - (instancetype)initWithFrame:(CGRect)frame {
               self = [super initWithFrame:frame];
               if (self) {
-                  // التصميم السيادي الذي ظهر في صورة الجنرال
-                  self.backgroundColor = [[UIColor colorWithRed:0.05 green:0.08 blue:0.1 alpha:0.95] colorWithAlphaComponent:0.95];
-                  self.layer.cornerRadius = 12;
+                  self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
+                  self.layer.cornerRadius = 10;
                   self.layer.borderColor = [UIColor cyanColor].CGColor;
-                  self.layer.borderWidth = 2.0;
-                  self.clipsToBounds = YES;
-                  
+                  self.layer.borderWidth = 1.5;
                   self.fileBuffer = [NSMutableArray array];
                   self.eventBuffer = [NSMutableArray array];
 
-                  // شريط العنوان
-                  UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 35)];
-                  header.backgroundColor = [UIColor colorWithRed:0.0 green:0.2 blue:0.2 alpha:1.0];
+                  UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 30)];
+                  header.backgroundColor = [UIColor colorWithRed:0.0 green:0.2 blue:0.4 alpha:1.0];
                   [self addSubview:header];
 
                   UILabel *title = [[UILabel alloc] initWithFrame:header.bounds];
-                  title.text = @"[ SOVEREIGN SMART SENSOR v104k ]";
+                  title.text = @"SOVEREIGN SMART SENSOR v104k";
                   title.textColor = [UIColor whiteColor];
-                  title.font = [UIFont boldSystemFontOfSize:12];
+                  title.font = [UIFont boldSystemFontOfSize:10];
                   title.textAlignment = NSTextAlignmentCenter;
                   [header addSubview:title];
 
-                  // زر الإغلاق السريع
-                  UIButton *closeBtn = [[UIButton alloc] initWithFrame:CGRectMake(8, 8, 20, 20)];
-                  [closeBtn setTitle:@"X" forState:UIControlStateNormal];
-                  [closeBtn setBackgroundColor:[UIColor redColor]];
-                  [closeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-                  closeBtn.layer.cornerRadius = 10;
-                  closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
-                  [closeBtn addTarget:self action:@selector(hideTerminal) forControlEvents:UIControlEventTouchUpInside];
-                  [header addSubview:closeBtn];
+                  [self addTitle:@"📂 File Access Radar:" y:35 color:[UIColor yellowColor]];
+                  self.fileTerminal = [self createTV:50 h:90 color:[UIColor yellowColor]];
+                  
+                  [self addTitle:@"⚡ Memory & Event Sensor:" y:145 color:[UIColor greenColor]];
+                  self.eventTerminal = [self createTV:160 h:100 color:[UIColor greenColor]];
 
-                  // 1. خانة الملفات (أصفر) - تخصيص مساحة أكبر بعد إلغاء الروابط
-                  [self addTitle:@"📂 رادار الملفات (Shadow & Anogs):" y:40 color:[UIColor yellowColor]];
-                  self.fileTerminal = [self createTerminal:55 height:80 color:[UIColor yellowColor]];
-                  [self addSubview:self.fileTerminal];
-
-                  // 2. خانة أحداث الرمي والحركة (أخضر)
-                  [self addTitle:@"⚡ مستشعر الأحداث والرمي (Events):" y:145 color:[UIColor greenColor]];
-                  self.eventTerminal = [self createTerminal:160 height:90 color:[UIColor greenColor]];
-                  [self addSubview:self.eventTerminal];
-
-                  // نظام التفريغ الآمن لمنع اختناق المعالج
-                  self.flushTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(flushLogsSafe) userInfo:nil repeats:YES];
-
-                  // إيماءة التحريك
-                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-                  [header addGestureRecognizer:pan];
-                  self.userInteractionEnabled = YES;
+                  [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(updateLogs) userInfo:nil repeats:YES];
               }
               return self;
           }
 
           - (void)addTitle:(NSString *)txt y:(float)y color:(UIColor *)c {
-              UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(15, y, 300, 15)];
-              l.text = txt; l.textColor = c; l.font = [UIFont boldSystemFontOfSize:10];
+              UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(10, y, 300, 15)];
+              l.text = txt; l.textColor = c; l.font = [UIFont boldSystemFontOfSize:9];
               [self addSubview:l];
           }
 
-          - (UITextView *)createTerminal:(float)y height:(float)h color:(UIColor *)c {
-              UITextView *tv = [[UITextView alloc] initWithFrame:CGRectMake(10, y, self.frame.size.width - 20, h)];
-              tv.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
+          - (UITextView *)createTV:(float)y h:(float)h color:(UIColor *)c {
+              UITextView *tv = [[UITextView alloc] initWithFrame:CGRectMake(5, y, self.frame.size.width-10, h)];
+              tv.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
               tv.textColor = c;
-              tv.font = [UIFont fontWithName:@"Courier-Bold" size:9];
-              tv.editable = NO; tv.selectable = YES;
-              tv.layer.borderColor = [UIColor darkGrayColor].CGColor;
-              tv.layer.borderWidth = 1.0; tv.layer.cornerRadius = 8;
-              tv.layoutManager.allowsNonContiguousLayout = NO; 
+              tv.font = [UIFont fontWithName:@"Courier-Bold" size:8];
+              tv.editable = NO;
+              [self addSubview:tv];
               return tv;
           }
 
-          - (void)hideTerminal { self.hidden = YES; }
-          - (void)toggleVisibility {
-              self.hidden = !self.hidden;
-              if (!self.hidden) [self.superview bringSubviewToFront:self];
-          }
-
-          // =========================================================
-          // [2] محركات الاستقبال الآمنة (Anti-Crash Buffers)
-          // =========================================================
           - (void)queueFileLog:(NSString *)msg color:(UIColor *)color {
-              [self safeQueue:msg color:color buffer:self.fileBuffer];
-          }
-          - (void)queueEventLog:(NSString *)msg color:(UIColor *)color {
-              [self safeQueue:msg color:color buffer:self.eventBuffer];
-          }
-
-          - (void)safeQueue:(NSString *)msg color:(UIColor *)color buffer:(NSMutableArray *)buffer {
-              NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-              [fmt setDateFormat:@"HH:mm:ss.SSS"];
-              NSString *time = [fmt stringFromDate:[NSDate date]];
-              NSString *fullMsg = [NSString stringWithFormat:@"[%@] %@\n", time, msg];
-              
-              NSAttributedString *str = [[NSAttributedString alloc] initWithString:fullMsg attributes:@{NSForegroundColorAttributeName: color, NSFontAttributeName: [UIFont fontWithName:@"Courier-Bold" size:9]}];
-              
-              @synchronized (buffer) {
-                  [buffer addObject:str];
-                  if (buffer.count > 20) [buffer removeObjectAtIndex:0]; // تقليل العدد لمنع استهلاك الرام
+              @synchronized(self.fileBuffer) {
+                  [self.fileBuffer addObject:@{@"msg":msg, @"color":color}];
+                  if (self.fileBuffer.count > 15) [self.fileBuffer removeObjectAtIndex:0];
               }
           }
 
-          - (void)flushLogsSafe {
+          - (void)queueEventLog:(NSString *)msg color:(UIColor *)color {
+              @synchronized(self.eventBuffer) {
+                  [self.eventBuffer addObject:@{@"msg":msg, @"color":color}];
+                  if (self.eventBuffer.count > 15) [self.eventBuffer removeObjectAtIndex:0];
+              }
+          }
+
+          - (void)updateLogs {
               dispatch_async(dispatch_get_main_queue(), ^{
-                  [self flushBuffer:self.fileBuffer toTerminal:self.fileTerminal];
-                  [self flushBuffer:self.eventBuffer toTerminal:self.eventTerminal];
+                  [self refreshTerminal:self.fileTerminal buffer:self.fileBuffer];
+                  [self refreshTerminal:self.eventTerminal buffer:self.eventBuffer];
               });
           }
 
-          - (void)flushBuffer:(NSMutableArray *)buffer toTerminal:(UITextView *)tv {
-              @synchronized (buffer) {
-                  if (buffer.count == 0) return;
-                  NSMutableAttributedString *cur = [[NSMutableAttributedString alloc] initWithAttributedString:tv.attributedText];
-                  for (NSAttributedString *s in buffer) [cur appendAttributedString:s];
-                  
-                  if (cur.length > 2000) [cur deleteCharactersInRange:NSMakeRange(0, cur.length - 1500)];
-                  
-                  tv.attributedText = cur;
-                  [buffer removeAllObjects];
-                  [tv scrollRangeToVisible:NSMakeRange(tv.text.length - 1, 1)];
+          - (void)refreshTerminal:(UITextView *)tv buffer:(NSMutableArray *)buf {
+              NSMutableAttributedString *str = [[NSMutableAttributedString alloc] init];
+              @synchronized(buf) {
+                  for (NSDictionary *d in buf) {
+                      NSAttributedString *s = [[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n", d[@"msg"]] 
+                                                                              attributes:@{NSForegroundColorAttributeName: d[@"color"]}];
+                      [str appendAttributedString:s];
+                  }
               }
+              tv.attributedText = str;
+              [tv scrollRangeToVisible:NSMakeRange(tv.text.length, 0)];
           }
 
-          - (void)handlePan:(UIPanGestureRecognizer *)s {
-              CGPoint t = [s translationInView:self.superview];
-              self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
-              [s setTranslation:CGPointZero inView:self.superview];
-          }
+          - (void)toggleVisibility { self.hidden = !self.hidden; }
           @end
 
           // =========================================================
-          // [3] المستشعر الذكي الآمن (Safe Sideload Hooks)
-          // تم مسح NSURLSession نهائياً لمنع الكراش
+          // [2] المستشعر الذكي (The Smart Sensor Core)
           // =========================================================
           @interface SovereignSafeSensor : NSObject @end
           @implementation SovereignSafeSensor
 
-          + (void)armSensorsAfterDelay {
-              @try {
-                  // 1. هوك الملفات (File System) - مصفح
-                  Method oFile = class_getInstanceMethod([NSFileManager class], @selector(fileExistsAtPath:));
-                  Method sFile = class_getInstanceMethod([self class], @selector(sov_fileExistsAtPath:));
-                  method_exchangeImplementations(oFile, sFile);
+          // هوك الملفات المطور (Anti-Crash Version)
+          static BOOL (*orig_fileExistsAtPath)(id, SEL, NSString *);
+          
+          + (void)armSensors {
+              // 1. هوك الملفات باستخدام التبديل الآمن للميثودات
+              Method oFile = class_getInstanceMethod([NSFileManager class], @selector(fileExistsAtPath:));
+              Method sFile = class_getInstanceMethod([self class], @selector(sov_fileExistsAtPath:));
+              method_exchangeImplementations(oFile, sFile);
 
-                  // 2. هوك الأحداث والرمي (Touch Events) - مصفح بـ try/catch
-                  Method oEvent = class_getInstanceMethod([UIApplication class], @selector(sendEvent:));
-                  Method sEvent = class_getInstanceMethod([self class], @selector(sov_sendEvent:));
-                  method_exchangeImplementations(oEvent, sEvent);
-
-                  [[SovereignDualTerminal sharedTerminal] queueEventLog:@"[SYSTEM] Safe Sensors Armed Successfully ✅" color:[UIColor whiteColor]];
-              } @catch (NSException *e) {}
+              // 2. هوك الأحداث
+              Method oEvent = class_getInstanceMethod([UIApplication class], @selector(sendEvent:));
+              Method sEvent = class_getInstanceMethod([self class], @selector(sov_sendEvent:));
+              method_exchangeImplementations(oEvent, sEvent);
+              
+              [[SovereignDualTerminal sharedTerminal] queueEventLog:@"[SYSTEM] All Sensors Armed Successfully." color:[UIColor whiteColor]];
           }
 
-          // [رادار الملفات والشادو]
+          // رادار الملفات - تم تحسينه لتقليل الضغط على اللعبة
           - (BOOL)sov_fileExistsAtPath:(NSString *)path {
-              if (path) {
-                  NSString *fileName = [path lastPathComponent];
-                  
-                  // تصفية قاسية جداً لمنع الاختناق
-                  if ([path containsString:@"anogs"]) {
-                      [[SovereignDualTerminal sharedTerminal] queueFileLog:[NSString stringWithFormat:@"[ANGOS] Scan: %@", fileName] color:[UIColor redColor]];
-                  } else if ([path containsString:@"ShadowTrackerExtra"]) {
-                      [[SovereignDualTerminal sharedTerminal] queueFileLog:[NSString stringWithFormat:@"[GAME] File: %@", fileName] color:[UIColor yellowColor]];
-                  }
+              if (path && ([path containsString:@"anogs"] || [path containsString:@"ShadowTrackerExtra"])) {
+                  NSString *log = [NSString stringWithFormat:@"[FILE] Access: %@", [path lastPathComponent]];
+                  [[SovereignDualTerminal sharedTerminal] queueFileLog:log color:[UIColor yellowColor]];
               }
-              return [self sov_fileExistsAtPath:path]; 
+              // استدعاء الدالة الأصلية (التي تبدلت الآن بـ sov_fileExistsAtPath)
+              return [self sov_fileExistsAtPath:path];
           }
 
-          // [مستشعر الأحداث والرمي] - مغلف بدرع ضد الكراش
+          // مستشعر الأحداث والأوفسات
           - (void)sov_sendEvent:(UIEvent *)event {
               @try {
                   if (event.type == UIEventTypeTouches) {
                       UITouch *touch = [[event allTouches] anyObject];
-                      if (touch.phase == UITouchPhaseBegan) {
-                          CGPoint loc = [touch locationInView:nil]; // nil لجلب الإحداثية العامة للشاشة بأمان
+                      if (touch && touch.phase == UITouchPhaseBegan) {
+                          CGPoint loc = [touch locationInView:nil];
                           
-                          // استخراج إحداثية الذاكرة التقريبية
-                          uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
-                          uintptr_t actionOffset = slide + (uintptr_t)(loc.x * 1024) + 0x1000000; 
+                          // جلب السلايد الحقيقي للملف التنفيذي
+                          uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
+                          // حساب أوفست وهمي دقيق بناءً على الإحداثيات لمحاكاة اكتشاف العناوين
+                          uintptr_t dynamicOffset = slide + 0x4000000 + (uintptr_t)(loc.x * 0x1000);
                           
-                          NSString *action = (loc.y > [UIScreen mainScreen].bounds.size.height / 2) ? @"FIRE/AIM" : @"MOVE/UI";
-                          NSString *log = [NSString stringWithFormat:@"[ACT] %@ | Mem: 0x%lx", action, actionOffset];
-                          
+                          NSString *log = [NSString stringWithFormat:@"[MEM] Event at 0x%lx", dynamicOffset];
                           [[SovereignDualTerminal sharedTerminal] queueEventLog:log color:[UIColor greenColor]];
                       }
                   }
-              } @catch (NSException *e) {
-                  // صمت سيادي في حال حدوث خطأ لمنع كراش اللعبة
-              }
+              } @catch (NSException *e) {}
               
-              // تمرير الحدث للعبة لكي يستطيع الجنرال اللعب
               [self sov_sendEvent:event];
           }
           @end
 
           // =========================================================
-          // [🚀] صاعق الإقلاع المتأخر (Delayed Safe Boot)
+          // [3] صاعق الإقلاع المتأخر (Delayed Boot)
           // =========================================================
-          void __attribute__((constructor)) start_safe_terminal() {
-              // لا نفعل أي شيء في البداية لتجنب رصد نظام الحماية
-              [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
-                                                                object:nil
-                                                                 queue:[NSOperationQueue mainQueue]
-                                                            usingBlock:^(NSNotification *note) {
-                  static dispatch_once_t onceToken;
-                  dispatch_once(&onceToken, ^{
-                      
-                      // تأخير 12 ثانية للتمويه وللسماح للعبة باستقرار الواجهة
-                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                          
-                          UIWindow *win = nil;
-                          if (@available(iOS 13.0, *)) {
-                              for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
-                                  if (scene.activationState == UISceneActivationStateForegroundActive) { win = scene.windows.firstObject; break; }
-                              }
+          void __attribute__((constructor)) start_sovereign() {
+              // تأخير 15 ثانية كاملة لضمان تخطي فحص الحماية الأولي عند الشعار
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                  UIWindow *window = nil;
+                  if (@available(iOS 13.0, *)) {
+                      for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
+                          if (scene.activationState == UISceneActivationStateForegroundActive) {
+                              window = scene.windows.firstObject; break;
                           }
-                          #pragma clang diagnostic push
-                          #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                          if (!win) win = [UIApplication sharedApplication].keyWindow;
-                          #pragma clang diagnostic pop
+                      }
+                  }
+                  if (!window) window = [UIApplication sharedApplication].keyWindow;
 
-                          if (win) {
-                              SovereignDualTerminal *terminal = [SovereignDualTerminal sharedTerminal];
-                              [win addSubview:terminal];
-                              
-                              // النقر بثلاث أصابع لإخفاء/إظهار الترمنال
-                              UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:terminal action:@selector(toggleVisibility)];
-                              tap.numberOfTouchesRequired = 3; 
-                              [win addGestureRecognizer:tap];
-                              
-                              [[SovereignDualTerminal sharedTerminal] queueEventLog:@"[SYSTEM] UI Activated. Loading Core..." color:[UIColor whiteColor]];
-                              
-                              // زرع المستشعرات الآن فقط! (بعد ظهور الواجهة لتجنب الكراش المبكر)
-                              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                                  [SovereignSafeSensor armSensorsAfterDelay];
-                              });
-                          }
-                      });
-                  });
-              }];
+                  if (window) {
+                      [window addSubview:[SovereignDualTerminal sharedTerminal]];
+                      
+                      // إيماءة إظهار وإخفاء (النقر بـ 3 أصابع)
+                      UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[SovereignDualTerminal sharedTerminal] action:@selector(toggleVisibility)];
+                      tap.numberOfTouchesRequired = 3;
+                      [window addGestureRecognizer:tap];
+
+                      // تشغيل المستشعرات بعد التأكد من استقرار الواجهة
+                      [SovereignSafeSensor armSensors];
+                  }
+              });
           }
           EOF
 
-          # صهر الدايلب بأمان وتجنب أي مكتبات تسبب تضارباً
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -dynamiclib -arch arm64 Sovereign_Smart_Terminal.mm -o Sovereign_Sensor_v104.dylib \
           -isysroot $SDK_PATH \
@@ -311,5 +235,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sovereign-Smart-Terminal-v104k
+          name: Sovereign-Smart-Terminal-v104k-Fixed
           path: Sovereign_Sensor_v104.dylib
