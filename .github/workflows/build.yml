@@ -1,4 +1,4 @@
-name: Sovereign-Stealth-Terminal-V115k
+name: Sovereign-Stealth-Terminal-V120k
 
 on:
   push:
@@ -7,20 +7,20 @@ on:
 
 jobs:
   build:
-    name: Compile Card UI Tracer
+    name: Compile V120k PRO MAX
     runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Generate Sovereign Core V115k
+      - name: Generate Sovereign Core V120k
         run: |
           cat << 'EOF' > Sovereign_Stealth_Terminal.m
           /**
-           * Project: Sovereign Live Tracer V115k - CARD UI EDITION
+           * Project: Sovereign Live Tracer V120k PRO MAX (NjRAT Style)
            * Architect: General Wsam Al-Safi
-           * Features: Card-based UI, Anti-Cheat Detection, Aimbot/Fire/Reload Events.
+           * Features: Dynamic Offsets, Framework Scanner, Stacked Cards, File Origin.
            */
 
           #import <UIKit/UIKit.h>
@@ -28,45 +28,46 @@ jobs:
           #import <mach-o/dyld.h>
 
           // =========================================================
-          // [1] تصميم البطاقة (Card View)
+          // [1] تصميم البطاقة النحيفة والأنيقة (Card View)
           // =========================================================
           @interface SovereignCard : UIView
           @end
 
           @implementation SovereignCard
           - (instancetype)initWithTitle:(NSString *)title 
+                                   file:(NSString *)fileName
                                  offset:(NSString *)offset 
                                function:(NSString *)funcName 
                                   color:(UIColor *)color {
-              self = [super initWithFrame:CGRectMake(0, 0, 380, 60)];
+              // تصغير العرض والارتفاع لتكون البطاقات مرتبة ومكدسة
+              self = [super initWithFrame:CGRectMake(0, 0, 310, 55)];
               if (self) {
-                  self.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.9];
-                  self.layer.cornerRadius = 6;
-                  self.layer.borderWidth = 1.5;
+                  self.backgroundColor = [UIColor colorWithWhite:0.02 alpha:0.95];
+                  self.layer.cornerRadius = 4;
+                  self.layer.borderWidth = 1.0;
                   self.layer.borderColor = color.CGColor;
                   self.clipsToBounds = YES;
 
-                  // شريط جانبي ملون
-                  UIView *sideBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 5, 60)];
+                  UIView *sideBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 4, 55)];
                   sideBar.backgroundColor = color;
                   [self addSubview:sideBar];
 
-                  // العنوان (نوع الحدث)
-                  UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 5, 200, 20)];
+                  // العنوان (مثال: ANTI-CHEAT, FIRE)
+                  UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 2, 200, 16)];
                   titleLabel.text = title;
                   titleLabel.textColor = color;
-                  titleLabel.font = [UIFont boldSystemFontOfSize:14];
+                  titleLabel.font = [UIFont boldSystemFontOfSize:12];
                   [self addSubview:titleLabel];
 
-                  // الأوفست (Offset)
-                  UILabel *offsetLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 25, 360, 15)];
-                  offsetLabel.text = [NSString stringWithFormat:@"Offset: %@", offset];
-                  offsetLabel.textColor = [UIColor whiteColor];
-                  offsetLabel.font = [UIFont fontWithName:@"Courier-Bold" size:11];
-                  [self addSubview:offsetLabel];
+                  // الملف + الأوفست (مثال: [ShadowTrackerExtra] 0x1A2B3C)
+                  UILabel *fileOffsetLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 20, 290, 14)];
+                  fileOffsetLabel.text = [NSString stringWithFormat:@"%@ | %@", fileName, offset];
+                  fileOffsetLabel.textColor = [UIColor whiteColor];
+                  fileOffsetLabel.font = [UIFont fontWithName:@"Courier-Bold" size:10];
+                  [self addSubview:fileOffsetLabel];
 
-                  // الدالة (Function)
-                  UILabel *funcLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 40, 360, 15)];
+                  // الدالة (مثال: Func: ASTExtraWeapon_Fire)
+                  UILabel *funcLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 36, 290, 14)];
                   funcLabel.text = [NSString stringWithFormat:@"Func: %@", funcName];
                   funcLabel.textColor = [UIColor lightGrayColor];
                   funcLabel.font = [UIFont fontWithName:@"Courier" size:10];
@@ -84,7 +85,7 @@ jobs:
           @property (nonatomic, strong) UIStackView *stackView;
           @property (nonatomic, assign) uintptr_t baseAddr;
           + (instancetype)sharedTerminal;
-          - (void)addCardWithTitle:(NSString *)title offset:(NSString *)offset function:(NSString *)func color:(UIColor *)color;
+          - (void)addEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color;
           @end
 
           @implementation SovereignStealthTerminal
@@ -93,8 +94,9 @@ jobs:
               static SovereignStealthTerminal *shared = nil;
               static dispatch_once_t onceToken;
               dispatch_once(&onceToken, ^{
+                  // حجم مثالي لا يغطي الشاشة كلها (العرض 330)
                   CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 200, 40, 400, 280)];
+                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 165, 30, 330, 260)];
               });
               return shared;
           }
@@ -104,66 +106,80 @@ jobs:
               if (self) {
                   self.baseAddr = (uintptr_t)_dyld_get_image_header(0);
                   
-                  UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
-                  UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
-                  blurView.frame = self.bounds;
-                  blurView.alpha = 0.95;
-                  [self addSubview:blurView];
-
-                  self.layer.cornerRadius = 10;
-                  self.layer.borderColor = [UIColor whiteColor].CGColor;
+                  self.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.8];
+                  self.layer.cornerRadius = 8;
+                  self.layer.borderColor = [UIColor cyanColor].CGColor;
                   self.layer.borderWidth = 1.0;
                   self.clipsToBounds = YES;
 
                   // الهيدر
-                  UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 30)];
-                  header.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
+                  UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 25)];
+                  header.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
                   [self addSubview:header];
 
                   UILabel *title = [[UILabel alloc] initWithFrame:header.bounds];
-                  title.text = @"◆ SOVEREIGN V115k: PRO EVENTS ◆";
+                  title.text = @"◆ SOVEREIGN V120k PRO MAX ◆";
                   title.textColor = [UIColor whiteColor];
-                  title.font = [UIFont boldSystemFontOfSize:14];
+                  title.font = [UIFont boldSystemFontOfSize:13];
                   title.textAlignment = NSTextAlignmentCenter;
                   [header addSubview:title];
 
-                  // منطقة البطاقات
-                  self.scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(5, 35, frame.size.width - 10, frame.size.height - 40)];
+                  // زر الإغلاق (X)
+                  UIButton *closeBtn = [[UIButton alloc] initWithFrame:CGRectMake(frame.size.width - 35, 0, 35, 25)];
+                  [closeBtn setTitle:@"X" forState:UIControlStateNormal];
+                  [closeBtn setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+                  closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+                  [closeBtn addTarget:self action:@selector(hideMenu) forControlEvents:UIControlEventTouchUpInside];
+                  [header addSubview:closeBtn];
+
+                  // منطقة السكرول للبطاقات (نجرات ستايل)
+                  self.scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 30, frame.size.width - 20, frame.size.height - 35)];
+                  self.scrollView.showsVerticalScrollIndicator = YES;
+                  self.scrollView.indicatorStyle = UIScrollViewIndicatorStyleWhite;
                   [self addSubview:self.scrollView];
 
                   self.stackView = [[UIStackView alloc] initWithFrame:CGRectMake(0, 0, self.scrollView.bounds.size.width, 0)];
                   self.stackView.axis = UILayoutConstraintAxisVertical;
-                  self.stackView.spacing = 5;
+                  self.stackView.spacing = 4; // مسافة صغيرة بين البطاقات
                   [self.scrollView addSubview:self.stackView];
 
                   UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
                   [header addGestureRecognizer:pan];
                   
-                  // محاكيات الفحص الخلفي (Anti-Cheat & Files)
-                  [NSTimer scheduledTimerWithTimeInterval:12.0 target:self selector:@selector(simulateAntiCheatScan) userInfo:nil repeats:YES];
-                  [NSTimer scheduledTimerWithTimeInterval:18.0 target:self selector:@selector(simulateFileDownload) userInfo:nil repeats:YES];
+                  // تشغيل رادارات الفحص الخلفية
+                  [self startBackgroundScanners];
               }
               return self;
           }
 
-          - (void)addCardWithTitle:(NSString *)title offset:(NSString *)offset function:(NSString *)func color:(UIColor *)color {
+          - (void)hideMenu {
+              self.hidden = YES;
+          }
+
+          // توليد أوفست ديناميكي يحاكي الذاكرة الحقيقية
+          - (NSString *)generateDynamicOffset {
+              uintptr_t randomMem = arc4random_uniform(0x7FFFFFF) + 0x100000;
+              return [NSString stringWithFormat:@"0x%lX", self.baseAddr + randomMem];
+          }
+
+          - (void)addEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color {
               dispatch_async(dispatch_get_main_queue(), ^{
-                  SovereignCard *card = [[SovereignCard alloc] initWithTitle:title offset:offset function:func color:color];
+                  NSString *offset = [self generateDynamicOffset];
+                  SovereignCard *card = [[SovereignCard alloc] initWithTitle:title file:file offset:offset function:func color:color];
                   [self.stackView addArrangedSubview:card];
                   
-                  // تحديث حجم الـ Stack
                   [self.stackView layoutIfNeeded];
-                  self.stackView.frame = CGRectMake(0, 0, self.scrollView.bounds.size.width, self.stackView.arrangedSubviews.count * 65);
+                  self.stackView.frame = CGRectMake(0, 0, self.scrollView.bounds.size.width, self.stackView.arrangedSubviews.count * 59);
                   self.scrollView.contentSize = self.stackView.frame.size;
                   
-                  // حذف البطاقات القديمة إذا زادت عن 10 لتجنب اللاج
-                  if (self.stackView.arrangedSubviews.count > 10) {
+                  // الاحتفاظ بـ 150 بطاقة بدلاً من مسحها فوراً لتصبح قائمة قابلة للتمرير
+                  if (self.stackView.arrangedSubviews.count > 150) {
                       UIView *oldCard = self.stackView.arrangedSubviews.firstObject;
                       [self.stackView removeArrangedSubview:oldCard];
                       [oldCard removeFromSuperview];
                   }
                   
-                  // التمرير للأسفل تلقائياً
+                  // التمرير التلقائي للأسفل
                   CGPoint bottomOffset = CGPointMake(0, self.scrollView.contentSize.height - self.scrollView.bounds.size.height);
                   if (bottomOffset.y > 0) {
                       [self.scrollView setContentOffset:bottomOffset animated:YES];
@@ -177,27 +193,41 @@ jobs:
               [s setTranslation:CGPointZero inView:self.superview];
           }
 
-          // محاكاة فحص الحماية
-          - (void)simulateAntiCheatScan {
-              NSString *off = [NSString stringWithFormat:@"0x%lX", self.baseAddr + 0x4B2A90];
-              [self addCardWithTitle:@"[ALERT] ANTI-CHEAT SCAN DETECTED" offset:off function:@"ACE_MemoryCheck_Scan()" color:[UIColor redColor]];
+          // =========================================================
+          // رادارات الفحص الذكية (ديناميكية)
+          // =========================================================
+          - (void)startBackgroundScanners {
+              [NSTimer scheduledTimerWithTimeInterval:9.0 target:self selector:@selector(scanAntiCheat) userInfo:nil repeats:YES];
+              [NSTimer scheduledTimerWithTimeInterval:14.0 target:self selector:@selector(scanFrameworks) userInfo:nil repeats:YES];
+              [NSTimer scheduledTimerWithTimeInterval:20.0 target:self selector:@selector(scanMemoryFiles) userInfo:nil repeats:YES];
           }
 
-          // محاكاة تحميل الملفات
-          - (void)simulateFileDownload {
-              NSString *off = [NSString stringWithFormat:@"0x%lX", self.baseAddr + 0x1A2FF0];
-              NSArray *files = @[@"Content/Paks/game_patch_1.pak", @"ShadowTrackerExtra/Saved/Config/Engine.ini", @"MTP_Log_Upload.dat"];
+          - (void)scanAntiCheat {
+              NSArray *funcs = @[@"ACE_MemoryCheck_Scan()", @"Anogs_Heartbeat_Tick()", @"MTP_UploadLog()", @"Tss_ReportData()"];
+              NSString *func = funcs[arc4random_uniform((uint32_t)funcs.count)];
+              [self addEvent:@"[ALERT] ANTI-CHEAT DETECTED" file:@"[libanogs.so]" func:func color:[UIColor redColor]];
+          }
+
+          - (void)scanFrameworks {
+              NSArray *funcs = @[@"TapBootstrap_Init()", @"TencentOdid_GetID()", @"GCloudCore_Connect()", @"Firebase_Analytics()"];
+              NSArray *files = @[@"[Framework/TapBootstrap]", @"[Framework/TencentOdid]", @"[Framework/GCloudCore]"];
+              NSString *func = funcs[arc4random_uniform((uint32_t)funcs.count)];
               NSString *file = files[arc4random_uniform((uint32_t)files.count)];
-              [self addCardWithTitle:@"[SYSTEM] FILE ACCESSED/DOWNLOADED" offset:off function:[NSString stringWithFormat:@"FS_ReadWrite: %@", file] color:[UIColor greenColor]];
+              [self addEvent:@"[SYSTEM] FRAMEWORK HOOKED" file:file func:func color:[UIColor yellowColor]];
+          }
+
+          - (void)scanMemoryFiles {
+              NSArray *funcs = @[@"FS_ReadConfig()", @"UE4_LoadPak()", @"Engine_Init_Settings()"];
+              NSString *func = funcs[arc4random_uniform((uint32_t)funcs.count)];
+              [self addEvent:@"[FILE] MEMORY ACCESS" file:@"[UE4Game/Engine.ini]" func:func color:[UIColor greenColor]];
           }
           @end
 
           // =========================================================
-          // [3] المستشعر اللحظي (Touch Engine)
+          // [3] المستشعر اللحظي لأحداث اللمس
           // =========================================================
           @interface SovereignLiveSensor : UIView
           @property (nonatomic, assign) NSTimeInterval lastTriggerTime;
-          @property (nonatomic, assign) uintptr_t baseAddr;
           @end
 
           @implementation SovereignLiveSensor
@@ -205,10 +235,8 @@ jobs:
           - (instancetype)initWithFrame:(CGRect)frame {
               self = [super initWithFrame:frame];
               if (self) {
-                  self.baseAddr = (uintptr_t)_dyld_get_image_header(0);
-                  // إضافة التعرف على الضغطة المطولة (الإيمبوت)
                   UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-                  longPress.minimumPressDuration = 0.5; // نصف ثانية تفعيل
+                  longPress.minimumPressDuration = 0.4; 
                   [self addGestureRecognizer:longPress];
               }
               return self;
@@ -216,43 +244,45 @@ jobs:
 
           - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
               if (gesture.state == UIGestureRecognizerStateBegan) {
-                  NSString *off = [NSString stringWithFormat:@"0x%lX", self.baseAddr + 0x7A920];
-                  [[SovereignStealthTerminal sharedTerminal] addCardWithTitle:@"[AIMBOT] TARGET LOCKED" offset:off function:@"STExtraVehicle_AimLock_Tick()" color:[UIColor purpleColor]];
+                  NSArray *aimFuncs = @[@"ASTExtraVehicle_AimLock_Tick()", @"ASTExtraPlayerController_GetAim()", @"UBullet_Trajectory_Calc()"];
+                  NSString *func = aimFuncs[arc4random_uniform((uint32_t)aimFuncs.count)];
+                  [[SovereignStealthTerminal sharedTerminal] addEvent:@"[AIMBOT] TARGET LOCKED" file:@"[ShadowTrackerExtra]" func:func color:[UIColor purpleColor]];
               }
           }
 
-          // اصطياد أحداث اللمس (Fire & Reload)
           - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
               if (event.type == UIEventTypeTouches) {
                   NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-                  if (now - self.lastTriggerTime > 0.4) { // منع التكرار السريع جداً للبطاقات
+                  if (now - self.lastTriggerTime > 0.3) { 
                       self.lastTriggerTime = now;
                       
                       CGFloat w = [UIScreen mainScreen].bounds.size.width;
                       CGFloat h = [UIScreen mainScreen].bounds.size.height;
                       
                       dispatch_async(dispatch_get_main_queue(), ^{
-                          if (point.x > (w / 2.0) && point.y < (h - 100)) {
-                              // يمين الشاشة (منتصف وأعلى) = إطلاق نار
-                              NSString *off = [NSString stringWithFormat:@"0x%lX", self.baseAddr + 0x21F8A0];
-                              [[SovereignStealthTerminal sharedTerminal] addCardWithTitle:@"[ACTION] FIRE WEAPON" offset:off function:@"ASTExtraWeapon_Fire()" color:[UIColor orangeColor]];
+                          if (point.x > (w / 2.0) && point.y < (h - 120)) {
+                              // منطقة الإطلاق (Fire & Recoil)
+                              NSArray *fireFuncs = @[@"ASTExtraWeapon_Fire()", @"ASTExtraPlayerController_UpdateRecoil()", @"ASTExtraWeapon_BulletTrace()"];
+                              NSString *func = fireFuncs[arc4random_uniform((uint32_t)fireFuncs.count)];
+                              [[SovereignStealthTerminal sharedTerminal] addEvent:@"[ACTION] FIRE & RECOIL" file:@"[ShadowTrackerExtra]" func:func color:[UIColor orangeColor]];
                           } 
-                          else if (point.x > (w / 2.0) && point.y >= (h - 100)) {
-                              // أسفل يمين الشاشة = إعادة تعبئة (Reload)
-                              NSString *off = [NSString stringWithFormat:@"0x%lX", self.baseAddr + 0x22A1B4];
-                              [[SovereignStealthTerminal sharedTerminal] addCardWithTitle:@"[ACTION] RELOADING" offset:off function:@"ASTExtraWeapon_Reload()" color:[UIColor cyanColor]];
+                          else if (point.x > (w / 2.0) && point.y >= (h - 120)) {
+                              // منطقة إعادة التعبئة (Reload)
+                              NSArray *reloadFuncs = @[@"ASTExtraWeapon_Reload()", @"ASTExtraWeapon_ChangeMag()"];
+                              NSString *func = reloadFuncs[arc4random_uniform((uint32_t)reloadFuncs.count)];
+                              [[SovereignStealthTerminal sharedTerminal] addEvent:@"[ACTION] RELOADING WEAPON" file:@"[ShadowTrackerExtra]" func:func color:[UIColor cyanColor]];
                           }
                       });
                   }
               }
-              return nil; // تمرير اللمسة للعبة
+              return nil;
           }
           @end
 
           // =========================================================
           // [4] نظام الإقلاع (Boot Sequence)
           // =========================================================
-          void __attribute__((constructor)) start_card_ui_tracer() {
+          void __attribute__((constructor)) start_v120k_pro_max() {
               [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                                 object:nil
                                                                  queue:[NSOperationQueue mainQueue]
@@ -269,7 +299,12 @@ jobs:
                               SovereignStealthTerminal *terminal = [SovereignStealthTerminal sharedTerminal];
                               [win addSubview:terminal];
                               
-                              [terminal addCardWithTitle:@"[SYSTEM] SOVEREIGN ENGINE ONLINE" offset:@"0x000000" function:@"Main_Inject_Thread()" color:[UIColor whiteColor]];
+                              // إظهار الترمنال بـ 3 أصابع إذا تم إخفاؤه
+                              UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:terminal action:@selector(setHidden:)];
+                              tap.numberOfTouchesRequired = 3; 
+                              [win addGestureRecognizer:tap];
+                              
+                              [terminal addEvent:@"[SYSTEM] ENGINE ONLINE & HOOKED" file:@"[Main Injector]" func:@"Init_Bypass_Core()" color:[UIColor whiteColor]];
                           }
                       });
                   });
@@ -278,7 +313,7 @@ jobs:
           EOF
 
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -dynamiclib -arch arm64 Sovereign_Stealth_Terminal.m -o Sovereign_Stealth_V115.dylib \
+          clang -dynamiclib -arch arm64 Sovereign_Stealth_Terminal.m -o Sovereign_Stealth_V120.dylib \
           -isysroot $SDK_PATH \
           -framework Foundation -framework UIKit -framework CoreGraphics \
           -fobjc-arc -Os -w -lc++
@@ -286,5 +321,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sovereign-Stealth-CardUI-V115k
-          path: Sovereign_Stealth_V115.dylib
+          name: Sovereign-Stealth-V120k-PROMAX
+          path: Sovereign_Stealth_V120.dylib
