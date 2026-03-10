@@ -16,7 +16,7 @@ jobs:
 
       - name: Generate Sovereign Core
         run: |
-          cat << 'EOF' > Sovereign_Stealth_Terminal.mm
+          cat << 'EOF' > Sovereign_Stealth_Terminal.m
           /**
            * Project: Sovereign Stealth Terminal v106k (Absolute Zero-Crash)
            * Architect: General Wsam Al-Safi
@@ -226,12 +226,12 @@ jobs:
           }
           EOF
 
-          # التجميع السليم للملفات
+          # التجميع السليم للملفات مع إضافة -lc++ لتجنب أخطاء اللينكر
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -dynamiclib -arch arm64 Sovereign_Stealth_Terminal.mm -o Sovereign_Stealth_v106.dylib \
+          clang -dynamiclib -arch arm64 Sovereign_Stealth_Terminal.m -o Sovereign_Stealth_v106.dylib \
           -isysroot $SDK_PATH \
           -framework Foundation -framework UIKit -framework CoreGraphics \
-          -fobjc-arc -Os -w
+          -fobjc-arc -Os -w -lc++
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
