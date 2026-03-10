@@ -132,7 +132,9 @@ jobs:
               dispatch_async(dispatch_get_main_queue(), ^{
                   NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
                   [fmt setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
-                  NSString *timestamp = [fmt stringFromDate:[NSDate]];
+                  
+                  // سحق خطأ الوقت عبر إضافة كلمة date مليمتر بمليمتر
+                  NSString *timestamp = [fmt stringFromDate:[NSDate date]];
                   
                   NSString *icon = @"->";
                   UIColor *textColor = [UIColor whiteColor];
@@ -167,9 +169,10 @@ jobs:
           }
           @end
 
-          #define SOV_LOG(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:0]
-          #define SOV_HOOK(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:2]
-          #define SOV_SUCCESS(msg) [[SovereignTerminal sharedTerminal] printLog:msg type:1]
+          // سحق خطأ الفواصل باستخدام الماكرو المتغير (Variadic Macros)
+          #define SOV_LOG(...) [[SovereignTerminal sharedTerminal] printLog:__VA_ARGS__ type:0]
+          #define SOV_HOOK(...) [[SovereignTerminal sharedTerminal] printLog:__VA_ARGS__ type:2]
+          #define SOV_SUCCESS(...) [[SovereignTerminal sharedTerminal] printLog:__VA_ARGS__ type:1]
 
           // =========================================================
           // [🧠] العقل المدبر: ربط الذاكرة واستخراج الـ ASLR
