@@ -148,7 +148,13 @@ jobs:
           }
 
           - (void)setupUI {
-              UIWindow *mainWindow = [UIApplication sharedApplication].keyWindow;
+              // 1. تجاوز تحذير آبل للنافذة الرئيسية بشكل هندسي سليم
+              UIWindow *mainWindow = nil;
+              #pragma clang diagnostic push
+              #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+              mainWindow = [UIApplication sharedApplication].keyWindow;
+              #pragma clang diagnostic pop
+              
               if (!mainWindow) return;
 
               floatingBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -175,7 +181,8 @@ jobs:
               menuView.hidden = YES;
 
               UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10, 5, width - 80, 25)];
-              title.text = "[ SOVEREIGN V200K - DOBBY HOOK ACTIVE ]";
+              // 2. إصلاح خطأ النص بإضافة علامة @ الخاصة بلغة Objective-C
+              title.text = @"[ SOVEREIGN V200K - DOBBY HOOK ACTIVE ]";
               title.textColor = [UIColor redColor];
               title.font = [UIFont fontWithName:@"Courier-Bold" size:12];
               [menuView addSubview:title];
