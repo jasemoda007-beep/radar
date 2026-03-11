@@ -21,8 +21,8 @@ jobs:
           cd Dobby
           mkdir build && cd build
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          # بناء مكتبة Dobby خصيصاً للآيفون (arm64)
-          cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT=$IOS_SDK -DDOBBY_GENERATE_SHARED=OFF -DDOBBY_DEBUG=OFF
+          # بناء مكتبة Dobby خصيصاً للآيفون مع تعريف المعالج بشكل صريح لتجنب الخطأ
+          cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_SYSROOT=$IOS_SDK -DDOBBY_GENERATE_SHARED=OFF -DDOBBY_DEBUG=OFF
           make -j4
           cd ../..
           # نقل ملفات المكتبة لمسار العمل
