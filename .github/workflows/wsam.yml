@@ -1,0 +1,177 @@
+name: Sovereign-Wissam-Engine
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    name: Wissam Cyber Security Suite
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Sovereign C++ Engine
+        run: |
+          cat << 'EOF_CPP' > sovereign_pro_fim.cpp
+          #include <iostream>
+          #include <fstream>
+          #include <string>
+          #include <filesystem>
+          #include <chrono>
+          #include <thread>
+          #include <iomanip>
+          #include <map>
+          #include <vector>
+          #include <sstream>
+
+          using namespace std;
+          namespace fs = std::filesystem;
+
+          // الألوان الجمالية
+          const string GOLD   = "\033[38;5;214m";
+          const string CYAN   = "\033[38;5;51m";
+          const string GREEN  = "\033[38;5;46m";
+          const string RED    = "\033[38;5;196m";
+          const string BLUE   = "\033[38;5;39m";
+          const string DIM    = "\033[38;5;240m";
+          const string RESET  = "\033[0m";
+
+          struct FileSnapshot {
+              uintmax_t size;
+              fs::file_time_type last_mod;
+              string checksum;
+          };
+
+          // خوارزمية البصمة السريعة (Checksum)
+          string calculateFileChecksum(const string& filepath) {
+              ifstream file(filepath, ios::binary);
+              if (!file) return "ERROR_READING";
+              unsigned long long hash = 14695981039346656037ULL;
+              char byte;
+              while (file.get(byte)) {
+                  hash ^= (unsigned char)byte;
+                  hash *= 1099511628211ULL;
+              }
+              stringstream ss;
+              ss << hex << setfill('0') << setw(16) << hash;
+              return ss.str();
+          }
+
+          void writeToAuditLog(const string& logEntry) {
+              ofstream auditFile("sovereign_audit.log", ios::app);
+              if (auditFile.is_open()) {
+                  auditFile << logEntry << endl;
+              }
+          }
+
+          // تصميم ممتد (الخدود الطويلة)
+          void printSovereignDashboard() {
+              cout << GOLD << "============================================================================================================" << endl;
+              cout << GOLD << "|| " << CYAN << "SOVEREIGN FIM ENGINE V20.0" << GOLD << " | \033[97m" << "iOS MACH-O MONITOR" << GOLD << " | \033[97m" << "ENG. WISSAM" << GOLD << " | \033[97m" << "BASRAH CYBER LABS" << GOLD << " ||" << endl;
+              cout << GOLD << "============================================================================================================" << RESET << endl;
+              cout << DIM << " [TIMESTAMP]    [EVENT TYPE]        [FILE TARGET]                       [INTEGRITY DETAILS]" << RESET << endl;
+              cout << GOLD << "------------------------------------------------------------------------------------------------------------" << RESET << endl;
+          }
+
+          void logEvent(const string& type, const string& target, const string& details, const string& color) {
+              auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+              stringstream timestamp;
+              timestamp << put_time(localtime(&now), "%H:%M:%S");
+
+              cout << DIM << " [" << timestamp.str() << "] " << RESET
+                   << color << left << setw(19) << ("[" + type + "]") << RESET
+                   << left << setw(35) << target 
+                   << color << details << RESET << endl;
+
+              string rawLog = "[" + timestamp.str() + "] [" + type + "] Target: " + target + " | Details: " + details;
+              writeToAuditLog(rawLog);
+          }
+
+          void runForensicMonitor(const string& directory) {
+              map<string, FileSnapshot> snapshotDB;
+              string mainTarget = "ShadowTrackerExtra";
+
+              logEvent("SYSTEM_BOOT", "ENGINE", "Initializing Monitor in Sandbox...", CYAN);
+
+              int cycles = 0;
+              // نجعل المراقبة تعمل لـ 8 ثواني فقط لتناسب بيئة GitHub Actions ثم تتوقف بنجاح
+              while (cycles < 8) {
+                  try {
+                      for (const auto& entry : fs::directory_iterator(directory)) {
+                          if (!entry.is_regular_file()) continue;
+
+                          string filename = entry.path().filename().string();
+                          if (filename == "sovereign_audit.log" || filename == "sovereign_monitor" || filename == "sovereign_pro_fim.cpp") continue;
+
+                          uintmax_t current_size = fs::file_size(entry);
+                          auto current_time = fs::last_write_time(entry);
+
+                          if (snapshotDB.find(filename) == snapshotDB.end()) {
+                              string checksum = calculateFileChecksum(entry.path().string());
+                              snapshotDB[filename] = {current_size, current_time, checksum};
+                              
+                              if (filename.find(mainTarget) != string::npos) {
+                                  logEvent("TARGET_LOCKED", filename, "New File Detected. Hash Generated.", GREEN);
+                              } else {
+                                  logEvent("BACKGROUND_FILE", filename, "Detected Download/Asset.", BLUE);
+                              }
+                          } 
+                          else if (snapshotDB[filename].last_mod != current_time || snapshotDB[filename].size != current_size) {
+                              string new_checksum = calculateFileChecksum(entry.path().string());
+                              if (filename.find(mainTarget) != string::npos) {
+                                  logEvent("TAMPER_DETECTED", filename, "File Modified! Hash changed.", RED);
+                              }
+                              snapshotDB[filename] = {current_size, current_time, new_checksum};
+                          }
+                      }
+                  } catch (...) {}
+
+                  this_thread::sleep_for(chrono::seconds(1));
+                  cycles++;
+              }
+              logEvent("SYS_EXIT", "ENGINE", "Monitoring cycle finished successfully.", GOLD);
+          }
+
+          int main() {
+              printSovereignDashboard();
+              writeToAuditLog("==================================================");
+              writeToAuditLog("NEW SESSION STARTED: ENG. WISSAM SOVEREIGN ENGINE");
+              writeToAuditLog("==================================================");
+              
+              runForensicMonitor(".");
+              return 0;
+          }
+          EOF_CPP
+
+      - name: Compile Sovereign C++ Engine
+        run: |
+          echo "🔥 Building Sovereign Pro Monitor..."
+          clang++ -std=c++17 -O3 sovereign_pro_fim.cpp -o sovereign_monitor
+          echo "✅ Compilation Successful."
+
+      - name: Run Background Tests
+        run: |
+          echo "🚀 Simulating live game events..."
+          
+          # تشغيل المحرك في الخلفية
+          ./sovereign_monitor &
+          MONITOR_PID=$!
+          
+          # محاكاة الأحداث أثناء عمل المحرك
+          sleep 2
+          echo "Mock Shadow Binary" > ShadowTrackerExtra
+          sleep 2
+          echo "Mock Downloaded Asset" > Enchos_Data.pak
+          sleep 2
+          echo "Tampering with Shadow Binary" >> ShadowTrackerExtra
+          
+          # انتظار المحرك ليُنهي دورته
+          wait $MONITOR_PID
+          
+          echo ""
+          echo "📄 Sovereign Audit Log Saved:"
+          cat sovereign_audit.log
