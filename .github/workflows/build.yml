@@ -1,180 +1,101 @@
-name: Sovereign-Live-Terminal-Build
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <unistd.h>
+#include <mach/mach.h>
+#include <mach-o/dyld.h>
+#include <dlfcn.h>
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
+using namespace std;
 
-jobs:
-  build:
-    name: Compile Sovereign Dylib
-    runs-on: macos-latest
+// دالة لعرض الرسائل مع تمييز الألوان
+void printWithColor(const string& msg, const string& color) {
+    // إضافة تلوين للرسائل حسب نوع الحدث
+    if (color == "info") {
+        cout << "\033[34m[INFO] " << msg << "\033[0m" << endl;
+    } else if (color == "success") {
+        cout << "\033[32m[SUCCESS] " << msg << "\033[0m" << endl;
+    } else if (color == "error") {
+        cout << "\033[31m[ERROR] " << msg << "\033[0m" << endl;
+    } else if (color == "event") {
+        cout << "\033[33m[EVENT] " << msg << "\033[0m" << endl;
+    } else {
+        cout << msg << endl;
+    }
+}
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+// دالة لمراقبة فتح أو قراءة الملفات (مثل ملف Shadow)
+void monitorFileAccess(const string& filePath) {
+    printWithColor("مراقبة الوصول إلى الملف: " + filePath, "info");
+    
+    // فتح الملف والتحقق إذا كان قابلاً للقراءة
+    ifstream file(filePath, ios::in | ios::binary);
+    if (file.is_open()) {
+        printWithColor("تم فتح الملف بنجاح: " + filePath, "success");
+        
+        // قراءة البيانات في الملف (مثلاً البيانات التي تتعلق بالملفات المحفوظة)
+        char buffer[256];
+        while (file.read(buffer, sizeof(buffer))) {
+            printWithColor("البيانات المقروءة: " + string(buffer), "event");
+        }
+        file.close();
+    } else {
+        printWithColor("فشل في فتح الملف: " + filePath, "error");
+    }
+}
 
-      - name: Generate Source Code
-        run: |
-          cat << 'EOF' > Sovereign_Real_Terminal.mm
-          /**
-           * نظام Sovereign Live Terminal v200k (Real Anti-Cheat Scanner)
-           * المصمم: المهندس وسام الصافي - البصرة / الناصرية
-           * الوظيفة: رصد الملفات المحملة حياً وإرسالها لـ api.php
-           */
+// دالة لفحص الأوفستات في الذاكرة (التي يمكن أن تكون مرتبطة بملفات اللعبة)
+void monitorOffsets() {
+    printWithColor("مراقبة الأوفستات في الذاكرة...", "info");
 
-          #import <UIKit/UIKit.h>
-          #import <mach-o/dyld.h>
-          #import <Foundation/Foundation.h>
-          #import <dlfcn.h> // [تمت الإضافة] مكتبة استخراج المعلومات من الذاكرة الحية
+    // مثال على مراقبة الأوفستات من خلال تحميل مكتبة ديناميكية (الذاكرة)
+    void* baseAddr = dlopen("libshadow.dylib", RTLD_LAZY);
+    if (baseAddr != NULL) {
+        printWithColor("تم العثور على المكتبة عند العنوان: " + to_string(reinterpret_cast<uintptr_t>(baseAddr)), "success");
+    } else {
+        printWithColor("فشل في العثور على المكتبة!", "error");
+    }
 
-          // [🎯] إحداثيات العقل المدبر (ضع رابط ملف api.php الخاص بك هنا)
-          #define BRAIN_API_URL @"http://16.171.230.58/api.php"
-          #define SECRET_KEY @"WSAM_COMMAND_2026"
+    // محاكاة تتبع الأوفستات في الذاكرة
+    uintptr_t targetOffset = reinterpret_cast<uintptr_t>(baseAddr) + 0x12345; // مثال لأوفست في الذاكرة
+    printWithColor("تتبع أوفست الذاكرة عند العنوان: " + to_string(targetOffset), "event");
 
-          @interface SovereignTerminalUI : UIView
-          @property (nonatomic, strong) UITextView *logView;
-          + (instancetype)shared;
-          - (void)logMessage:(NSString *)msg color:(UIColor *)color;
-          - (void)sendIntelToBrain:(NSString *)moduleName baseAddress:(uintptr_t)base type:(NSString*)type;
-          @end
+    // يمكن هنا إضافة أي من الدوال لتعقب التغيرات في هذا الأوفست
+}
 
-          @implementation SovereignTerminalUI
-          + (instancetype)shared {
-              static SovereignTerminalUI *shared = nil;
-              static dispatch_once_t onceToken;
-              dispatch_once(&onceToken, ^{
-                  CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 160, 50, 320, 200)];
-              });
-              return shared;
-          }
+// دالة لفحص الذاكرة باستخدام scan قوي
+void scanMemory() {
+    printWithColor("بدأ مسح الذاكرة...", "info");
 
-          - (instancetype)initWithFrame:(CGRect)frame {
-              self = [super initWithFrame:frame];
-              if (self) {
-                  self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.9];
-                  self.layer.cornerRadius = 10;
-                  self.layer.borderColor = [UIColor cyanColor].CGColor;
-                  self.layer.borderWidth = 1.5;
+    // مسح الذاكرة الديناميكية هنا باستخدام تقنيات معينة (هذه طريقة افتراضية)
+    uintptr_t startAddress = 0x10000000; // البداية الافتراضية
+    uintptr_t endAddress = 0x20000000;   // النهاية الافتراضية
 
-                  UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 5, frame.size.width, 20)];
-                  title.text = @"[ SOVEREIGN LIVE TRACER ]";
-                  title.textColor = [UIColor cyanColor];
-                  title.textAlignment = NSTextAlignmentCenter;
-                  title.font = [UIFont boldSystemFontOfSize:11];
-                  [self addSubview:title];
+    for (uintptr_t addr = startAddress; addr < endAddress; addr += 0x1000) {
+        // استخدام دالة scan لقراءة الذاكرة هنا (مراقبة التغيرات)
+        printWithColor("مسح الذاكرة عند العنوان: " + to_string(addr), "event");
 
-                  self.logView = [[UITextView alloc] initWithFrame:CGRectMake(5, 30, frame.size.width - 10, frame.size.height - 35)];
-                  self.logView.backgroundColor = [UIColor clearColor];
-                  self.logView.editable = NO;
-                  self.logView.selectable = NO;
-                  [self addSubview:self.logView];
+        // في بيئة حقيقية، يمكنك استخدام دالة خاصة لقراءة الذاكرة في هذا العنوان
+    }
+}
 
-                  // تفعيل التحريك
-                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-                  [self addGestureRecognizer:pan];
-                  self.userInteractionEnabled = YES;
-              }
-              return self;
-          }
+// الواجهة الرئيسية التي تبدأ المراقبة
+void startMonitoring() {
+    printWithColor("بدء المراقبة...", "info");
 
-          - (void)handlePan:(UIPanGestureRecognizer *)p {
-              CGPoint t = [p translationInView:self.superview];
-              self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
-              [p setTranslation:CGPointZero inView:self.superview];
-          }
+    // مراقبة ملفات اللعبة (مثال لملف Shadow)
+    string shadowFilePath = "/path/to/shadow_file";
+    monitorFileAccess(shadowFilePath);
 
-          - (void)logMessage:(NSString *)msg color:(UIColor *)color {
-              dispatch_async(dispatch_get_main_queue(), ^{
-                  NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-                  [fmt setDateFormat:@"HH:mm:ss"];
-                  NSString *time = [fmt stringFromDate:[NSDate date]];
-                  
-                  NSString *line = [NSString stringWithFormat:@"[%@] %@\n", time, msg];
-                  NSAttributedString *attr = [[NSAttributedString alloc] initWithString:line attributes:@{NSForegroundColorAttributeName: color, NSFontAttributeName: [UIFont fontWithName:@"Courier-Bold" size:9]}];
-                  
-                  NSMutableAttributedString *current = [[NSMutableAttributedString alloc] initWithAttributedString:self.logView.attributedText];
-                  [current appendAttributedString:attr];
-                  self.logView.attributedText = current;
-                  
-                  NSRange range = NSMakeRange(self.logView.text.length - 1, 1);
-                  [self.logView scrollRangeToVisible:range];
-              });
-          }
+    // مراقبة الأوفستات
+    monitorOffsets();
 
-          // دالة إرسال تقرير التشريح للعقل المدبر (api.php)
-          - (void)sendIntelToBrain:(NSString *)moduleName baseAddress:(uintptr_t)base type:(NSString*)type {
-              NSDictionary *payload = @{
-                  @"event_type": type,
-                  @"module": moduleName,
-                  @"base_address": [NSString stringWithFormat:@"0x%lx", base],
-                  @"device": @"General_Wsam_iOS"
-              };
+    // مسح الذاكرة (scan) في اللعبة
+    scanMemory();
+}
 
-              NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
-              NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:BRAIN_API_URL]];
-              [request setHTTPMethod:@"POST"];
-              [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-              [request setValue:SECRET_KEY forHTTPHeaderField:@"X-Sovereign-Key"];
-              [request setHTTPBody:jsonData];
-
-              [[[NSURLSession sharedSession] dataTaskWithRequest:request] resume];
-          }
-          @end
-
-          // =========================================================
-          // [🛡️] رادار كشف الحماية والملفات التي تنزل حياً
-          // =========================================================
-          void on_image_loaded(const struct mach_header* mh, intptr_t vmaddr_slide) {
-              Dl_info info;
-              // [الحل السيادي]: استخدام dladdr للبحث عن اسم الملف من عنوانه في الذاكرة
-              if (dladdr(mh, &info) == 0) return; 
-              
-              const char *image_name = info.dli_fname;
-              if (!image_name) return;
-
-              NSString *fullPath = [NSString stringWithUTF8String:image_name];
-              NSString *shortName = [fullPath lastPathComponent];
-
-              // فلترة الملفات الحساسة (Anti-Cheats & Game Engine)
-              if ([shortName containsString:@"anogs"] || [shortName containsString:@"Tersafe"] || [shortName containsString:@"ShadowTracker"]) {
-                  NSString *msg = [NSString stringWithFormat:@"Detected: %@ at 0x%lx", shortName, (uintptr_t)mh];
-                  [[SovereignTerminalUI shared] logMessage:msg color:[UIColor redColor]];
-                  
-                  // إرسال الإحداثيات لـ API عبر العقل المدبر
-                  [[SovereignTerminalUI shared] sendIntelToBrain:shortName baseAddress:(uintptr_t)mh type:@"ANTI_CHEAT_LOADED"];
-              } else {
-                  // طباعة الملفات العادية باللون الأخضر داخل الهاتف فقط
-                  NSString *msg = [NSString stringWithFormat:@"Loaded: %@", shortName];
-                  [[SovereignTerminalUI shared] logMessage:msg color:[UIColor greenColor]];
-              }
-          }
-
-          void __attribute__((constructor)) start_real_tracer() {
-              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                  UIWindow *win = [UIApplication sharedApplication].keyWindow;
-                  if (win) {
-                      [win addSubview:[SovereignTerminalUI shared]];
-                      [[SovereignTerminalUI shared] logMessage:@"Sovereign Brain Link Active..." color:[UIColor yellowColor]];
-                      
-                      // تسجيل الرادار ليعمل تلقائياً عند نزول أي ملف في الذاكرة
-                      _dyld_register_func_for_add_image(on_image_loaded);
-                  }
-              });
-          }
-          EOF
-
-      - name: Compile to Dylib
-        run: |
-          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -dynamiclib -arch arm64 Sovereign_Real_Terminal.mm -o Sovereign_Real_Terminal.dylib \
-          -isysroot $SDK_PATH \
-          -framework Foundation -framework UIKit -framework CoreGraphics \
-          -fobjc-arc -Os -w -lc++
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Sovereign-Terminal-Dylib
-          path: Sovereign_Real_Terminal.dylib
+int main() {
+    // بدء عملية المراقبة
+    startMonitoring();
+    return 0;
+}
