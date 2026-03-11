@@ -21,7 +21,7 @@ jobs:
           cd Dobby
           mkdir build && cd build
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          # بناء مكتبة Dobby خصيصاً للآيفون مع تعريف المعالج بشكل صريح لتجنب الخطأ
+          # بناء مكتبة Dobby خصيصاً للآيفون (arm64)
           cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_SYSROOT=$IOS_SDK -DDOBBY_GENERATE_SHARED=OFF -DDOBBY_DEBUG=OFF
           make -j4
           cd ../..
@@ -84,29 +84,20 @@ jobs:
           // 🎯 قسم المهندس وسام لإضافة الاوفسات (DOBBY HOOKS)
           // =========================================================================
 
-          // 1. دالة ذكية لحساب الـ ASLR (لكي تضع أوفست IDA مباشرة)
           uintptr_t getRealOffset(uintptr_t ida_offset) {
               uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
               return slide + ida_offset;
           }
 
-          // 2. مثال على دالة بديلة (Hook Function) للاعتراض
           void (*orig_Tick)(void* _this, float DeltaTime);
           void my_Tick(void* _this, float DeltaTime) {
-              // هنا يمكنك كتابة كودك الخاص، مثل تعديل السرعة أو إيقاف الحماية
-              
-              // استدعاء الدالة الأصلية حتى لا تنهار اللعبة
               orig_Tick(_this, DeltaTime);
           }
 
-          // 3. محرك تفعيل دوبلي
           void setupDobbyHooks() {
               logEvent("DOBBY", "ENGINE", "Initializing Dobby Inline Hook Framework...");
-              
-              // مثال توضيحي لكيفية الاستخدام (ضع الأوفست الحقيقي الخاص بك من IDA هنا)
               // uintptr_t targetOffset = getRealOffset(0x10CAA0300); // UWorld::Tick
               // DobbyHook((void*)targetOffset, (void*)my_Tick, (void**)&orig_Tick);
-              
               logEvent("DOBBY", "STATUS", "Dobby Framework is ACTIVE and ready for offsets.");
           }
           // =========================================================================
@@ -220,7 +211,6 @@ jobs:
               PrintToScreen("  DEVELOPER: ENG. WISSAM (BASRAH CYBER LABS)");
               PrintToScreen("============================================");
               
-              // تشغيل محركات المراقبة والدوبلي
               setupDobbyHooks();
               std::thread(runForensicMonitor).detach();
           }
@@ -260,8 +250,8 @@ jobs:
           echo "🔥 Building Sovereign Visual Dylib + Dobby for iPhone..."
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           
-          # دمج كود الواجهة مع مكتبة Dobby الثابتة (libdobby.a)
-          clang++ -x objective-c++ -std=c++17 -arch arm64 -isysroot $IOS_SDK -miphoneos-version-min=12.0 -fobjc-arc -dynamiclib -framework Foundation -framework UIKit -L. -ldobby sovereign_dylib.mm -o SovereignEngine.dylib
+          # رفعنا الحد الأدنى للإصدار إلى 13.0 لتتوافق مكتبة <filesystem> بدون أي أخطاء
+          clang++ -x objective-c++ -std=c++17 -arch arm64 -isysroot $IOS_SDK -miphoneos-version-min=13.0 -fobjc-arc -dynamiclib -framework Foundation -framework UIKit -L. -ldobby sovereign_dylib.mm -o SovereignEngine.dylib
           
           echo "✅ Compilation Successful!"
 
