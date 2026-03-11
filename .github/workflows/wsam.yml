@@ -240,7 +240,8 @@ jobs:
               UIView *view = recognizer.view;
               CGPoint translation = [recognizer translationInView:view.superview];
               view.center = CGPointMake(view.center.x + translation.x, view.center.y + translation.y);
-              [recognizer setTranslation:CGPointZero inView:view.superview];
+              // استبدلنا CGPointZero بـ CGPointMake(0, 0) لكي لا نحتاج مكاتب إضافية وتعمل بسلاسة
+              [recognizer setTranslation:CGPointMake(0, 0) inView:view.superview];
           }
           @end
 
@@ -257,8 +258,8 @@ jobs:
           echo "🔥 Building Sovereign Visual Dylib + Dobby for iPhone..."
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           
-          # رفعنا الحد الأدنى للإصدار إلى 13.0 لتتوافق مكتبة <filesystem> بدون أي أخطاء
-          clang++ -x objective-c++ -std=c++17 -arch arm64 -isysroot $IOS_SDK -miphoneos-version-min=13.0 -fobjc-arc -dynamiclib -framework Foundation -framework UIKit -L. -ldobby sovereign_dylib.mm -o SovereignEngine.dylib
+          # أضفنا مكتبة CoreGraphics لحل خطأ الرسوميات نهائياً
+          clang++ -x objective-c++ -std=c++17 -arch arm64 -isysroot $IOS_SDK -miphoneos-version-min=13.0 -fobjc-arc -dynamiclib -framework Foundation -framework UIKit -framework CoreGraphics -L. -ldobby sovereign_dylib.mm -o SovereignEngine.dylib
           
           echo "✅ Compilation Successful!"
 
