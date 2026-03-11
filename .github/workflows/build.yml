@@ -2,7 +2,7 @@ name: Sovereign-V200k-Ultimate
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -97,7 +97,7 @@ jobs:
           @interface SovereignTerminal : UIView <UITableViewDelegate, UITableViewDataSource>
           @property (nonatomic, strong) UITableView *tableView;
           @property (nonatomic, strong) NSMutableArray<SovLogEntry *> *logs;
-          @property (nonatomic, strong) UIButton *copyBtn;
+          @property (nonatomic, strong) UIButton *exportBtn; // تم تصحيح الاسم هنا
           + (instancetype)shared;
           - (void)logEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color;
           @end
@@ -133,15 +133,15 @@ jobs:
                   titleLbl.font = [UIFont boldSystemFontOfSize:12];
                   [header addSubview:titleLbl];
 
-                  self.copyBtn = [[UIButton alloc] initWithFrame:CGRectMake(frame.size.width - 65, 3, 60, 24)];
-                  self.copyBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
-                  self.copyBtn.layer.borderWidth = 0.5;
-                  self.copyBtn.layer.borderColor = [UIColor greenColor].CGColor;
-                  [self.copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
-                  [self.copyBtn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
-                  self.copyBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
-                  [self.copyBtn addTarget:self action:@selector(copyLogs) forControlEvents:UIControlEventTouchUpInside];
-                  [header addSubview:self.copyBtn];
+                  self.exportBtn = [[UIButton alloc] initWithFrame:CGRectMake(frame.size.width - 65, 3, 60, 24)];
+                  self.exportBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+                  self.exportBtn.layer.borderWidth = 0.5;
+                  self.exportBtn.layer.borderColor = [UIColor greenColor].CGColor;
+                  [self.exportBtn setTitle:@"COPY" forState:UIControlStateNormal];
+                  [self.exportBtn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
+                  self.exportBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+                  [self.exportBtn addTarget:self action:@selector(actionCopyLogs) forControlEvents:UIControlEventTouchUpInside];
+                  [header addSubview:self.exportBtn];
 
                   // TableView
                   self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, 30, frame.size.width, frame.size.height - 30) style:UITableViewStylePlain];
@@ -168,15 +168,15 @@ jobs:
               [s setTranslation:CGPointZero inView:self.superview];
           }
 
-          - (void)copyLogs {
+          - (void)actionCopyLogs {
               NSMutableString *str = [NSMutableString stringWithString:@"=== SOVEREIGN V200K LOGS ===\n"];
               for (SovLogEntry *e in self.logs) {
                   [str appendFormat:@"[%@] %@ | %@ | %@\n", e.title, e.file, e.offset, e.funcName];
               }
               [UIPasteboard generalPasteboard].string = str;
-              [self.copyBtn setTitle:@"COPIED" forState:UIControlStateNormal];
+              [self.exportBtn setTitle:@"COPIED" forState:UIControlStateNormal];
               dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                  [self.copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
+                  [self.exportBtn setTitle:@"COPY" forState:UIControlStateNormal];
               });
           }
 
@@ -195,7 +195,7 @@ jobs:
                   entry.color = color;
                   
                   [self.logs addObject:entry];
-                  if (self.logs.count > 500) { [self.logs removeObjectAtIndex:0]; } // حماية من الكراش
+                  if (self.logs.count > 500) { [self.logs removeObjectAtIndex:0]; } 
                   
                   [self.tableView reloadData];
                   NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.logs.count - 1 inSection:0];
@@ -270,7 +270,7 @@ jobs:
               if (!window) return;
 
               UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap)];
-              tap.cancelsTouchesInView = NO; // مهم جداً لكي لا يخرب اللعب
+              tap.cancelsTouchesInView = NO; 
               tap.delegate = (id<UIGestureRecognizerDelegate>)self;
               [window addGestureRecognizer:tap];
               
@@ -286,14 +286,13 @@ jobs:
           }
 
           + (void)handleSwipe {
-              // نسبة عشوائية لكي لا يمتلئ السجل عند كل حركة صغيرة
               if (arc4random_uniform(10) > 7) {
                  [[SovereignTerminal shared] logEvent:@"RECOIL CONTROL" file:@"ShadowTrackerExtra" func:@"Recoil_Compensation_Applied()" color:[UIColor greenColor]];
               }
           }
 
           + (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
-              return YES; // السماح بلمس اللعبة والمستشعر في نفس الوقت
+              return YES; 
           }
           @end
 
@@ -346,7 +345,7 @@ jobs:
                               SovFloatingBtn *btn = [[SovFloatingBtn alloc] initWithFrame:CGRectMake(20, 100, 40, 40)];
                               [win addSubview:btn];
                               
-                              [SovGlobalSensor activate]; // تفعيل مستشعرات اللمس الحية
+                              [SovGlobalSensor activate]; 
                               
                               [[SovereignTerminal shared] logEvent:@"SYSTEM ONLINE" file:@"Injector" func:@"Core_Init_Success()" color:[UIColor whiteColor]];
                           }
