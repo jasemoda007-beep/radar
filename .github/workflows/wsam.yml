@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-export-ios-ui:
-    name: Build Sovereign Dylib (Dobby + UI)
+    name: Build Sovereign Dylib (Safe UI Monitor)
     runs-on: macos-latest
 
     steps:
@@ -21,11 +21,9 @@ jobs:
           cd Dobby
           mkdir build && cd build
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          # بناء مكتبة Dobby خصيصاً للآيفون (arm64)
           cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_SYSROOT=$IOS_SDK -DDOBBY_GENERATE_SHARED=OFF -DDOBBY_DEBUG=OFF
           make -j4
           cd ../..
-          # نقل ملفات المكتبة لمسار العمل
           cp Dobby/include/dobby.h .
           cp Dobby/build/libdobby.a .
           echo "✅ Dobby Framework Ready."
@@ -45,7 +43,6 @@ jobs:
           #include <sstream>
           #include <map>
           
-          // تضمين مكتبة دوبلي القوية
           #include "dobby.h"
 
           using namespace std;
@@ -81,7 +78,7 @@ jobs:
           }
 
           // =========================================================================
-          // 🎯 قسم المهندس وسام لإضافة الاوفسات (DOBBY HOOKS)
+          // 🎯 قسم المهندس وسام (تم التعطيل للأمان ومنع الكراش)
           // =========================================================================
 
           uintptr_t getRealOffset(uintptr_t ida_offset) {
@@ -95,40 +92,45 @@ jobs:
           }
 
           void setupDobbyHooks() {
-              logEvent("DOBBY", "ENGINE", "Initializing Dobby Inline Hook Framework...");
-              // uintptr_t targetOffset = getRealOffset(0x10CAA0300); // UWorld::Tick
+              logEvent("DOBBY", "ENGINE", "Dobby Framework is loaded but HOOKS ARE DISABLED for safety.");
+              logEvent("INFO", "STATUS", "Find the correct Offset in IDA Pro to enable hacking.");
+              
+              // ⚠️ تم وضع علامة // لإيقاف الكمين ومنع انهيار اللعبة
+              // uintptr_t targetOffset = getRealOffset(0x10CAA0300); 
               // DobbyHook((void*)targetOffset, (void*)my_Tick, (void**)&orig_Tick);
-              logEvent("DOBBY", "STATUS", "Dobby Framework is ACTIVE and ready for offsets.");
           }
           // =========================================================================
 
-          // محرك المراقبة (مراقبة التنزيلات وملف الشادو)
+          // محرك المراقبة (يعمل بأمان تام)
           void runForensicMonitor() {
               NSString *docPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-              string directory = string([docPath UTF8String]);
+              NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
               
-              logEvent("SYS", "ENGINE", "Sovereign Initialized in Sandbox.");
+              vector<string> directories = { string([docPath UTF8String]), string([bundlePath UTF8String]) };
+              
+              logEvent("SYS", "SCANNER", "Searching App Bundle & Sandbox...");
               map<string, bool> seenFiles;
 
               while (true) {
-                  try {
-                      for (const auto& entry : fs::directory_iterator(directory)) {
-                          if (!entry.is_regular_file()) continue;
-                          string filename = entry.path().filename().string();
-                          
-                          if (seenFiles.find(filename) == seenFiles.end()) {
-                              seenFiles[filename] = true;
-                              uintmax_t size = fs::file_size(entry);
+                  for (const auto& dir : directories) {
+                      try {
+                          for (const auto& entry : fs::directory_iterator(dir)) {
+                              if (!entry.is_regular_file()) continue;
+                              string filename = entry.path().filename().string();
                               
-                              if (filename.find("ShadowTrackerExtra") != string::npos) {
-                                  logEvent("TARGET", filename, "Target loaded! Size: " + to_string(size) + "B");
-                              } else {
-                                  logEvent("NEW_FILE", filename, "Downloaded in bg. Size: " + to_string(size) + "B");
+                              if (seenFiles.find(filename) == seenFiles.end()) {
+                                  seenFiles[filename] = true;
+                                  
+                                  if (filename.find("ShadowTrackerExtra") != string::npos) {
+                                      logEvent("TARGET_FOUND", filename, "Binary located in memory space!");
+                                  } else if (filename.find(".pak") != string::npos || filename.find(".json") != string::npos) {
+                                      logEvent("ASSET_LOADED", filename, "Background file detected.");
+                                  }
                               }
                           }
-                      }
-                  } catch (...) {}
-                  this_thread::sleep_for(chrono::seconds(3));
+                      } catch (...) {}
+                  }
+                  this_thread::sleep_for(chrono::seconds(5));
               }
           }
 
@@ -148,7 +150,6 @@ jobs:
           }
 
           - (void)setupUI {
-              // 1. تجاوز تحذير آبل للنافذة الرئيسية بشكل هندسي سليم
               UIWindow *mainWindow = nil;
               #pragma clang diagnostic push
               #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -181,8 +182,7 @@ jobs:
               menuView.hidden = YES;
 
               UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10, 5, width - 80, 25)];
-              // 2. إصلاح خطأ النص بإضافة علامة @ الخاصة بلغة Objective-C
-              title.text = @"[ SOVEREIGN V200K - DOBBY HOOK ACTIVE ]";
+              title.text = @"[ SOVEREIGN V200K - SAFE MONITOR ACTIVE ]";
               title.textColor = [UIColor redColor];
               title.font = [UIFont fontWithName:@"Courier-Bold" size:12];
               [menuView addSubview:title];
@@ -214,7 +214,7 @@ jobs:
               [mainWindow addSubview:floatingBtn];
               
               PrintToScreen("============================================");
-              PrintToScreen("  SOVEREIGN MONITOR + DOBBY ENGINE INJECTED");
+              PrintToScreen("  SOVEREIGN MONITOR INJECTED (SAFE MODE)");
               PrintToScreen("  DEVELOPER: ENG. WISSAM (BASRAH CYBER LABS)");
               PrintToScreen("============================================");
               
@@ -240,7 +240,6 @@ jobs:
               UIView *view = recognizer.view;
               CGPoint translation = [recognizer translationInView:view.superview];
               view.center = CGPointMake(view.center.x + translation.x, view.center.y + translation.y);
-              // استبدلنا CGPointZero بـ CGPointMake(0, 0) لكي لا نحتاج مكاتب إضافية وتعمل بسلاسة
               [recognizer setTranslation:CGPointMake(0, 0) inView:view.superview];
           }
           @end
@@ -257,15 +256,12 @@ jobs:
         run: |
           echo "🔥 Building Sovereign Visual Dylib + Dobby for iPhone..."
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          
-          # أضفنا مكتبة CoreGraphics لحل خطأ الرسوميات نهائياً
           clang++ -x objective-c++ -std=c++17 -arch arm64 -isysroot $IOS_SDK -miphoneos-version-min=13.0 -fobjc-arc -dynamiclib -framework Foundation -framework UIKit -framework CoreGraphics -L. -ldobby sovereign_dylib.mm -o SovereignEngine.dylib
-          
           echo "✅ Compilation Successful!"
 
       - name: Upload iOS Dylib Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sovereign-Dobby-Dylib
+          name: Sovereign-Safe-Monitor-Dylib
           path: SovereignEngine.dylib
           retention-days: 5
