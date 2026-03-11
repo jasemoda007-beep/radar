@@ -171,7 +171,7 @@ jobs:
           clang -dynamiclib -arch arm64 Sovereign_Real_Terminal.mm -o Sovereign_Real_Terminal.dylib \
           -isysroot $SDK_PATH \
           -framework Foundation -framework UIKit -framework CoreGraphics \
-          -fobjc-arc -Os -w
+          -fobjc-arc -Os -w -lc++
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
