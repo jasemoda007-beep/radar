@@ -6,158 +6,268 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-export:
-    name: Build Sovereign Dylib
+  build-and-export-ios-ui:
+    name: Build Sovereign Dylib (Dobby + UI)
     runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Generate Sovereign C++ Dylib Source
+      - name: Download & Build Dobby Framework
         run: |
-          cat << 'EOF_CPP' > sovereign_dylib.cpp
+          echo "📥 Fetching Dobby Framework..."
+          git clone --depth=1 https://github.com/jmpews/Dobby.git
+          cd Dobby
+          mkdir build && cd build
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          # بناء مكتبة Dobby خصيصاً للآيفون (arm64)
+          cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT=$IOS_SDK -DDOBBY_GENERATE_SHARED=OFF -DDOBBY_DEBUG=OFF
+          make -j4
+          cd ../..
+          # نقل ملفات المكتبة لمسار العمل
+          cp Dobby/include/dobby.h .
+          cp Dobby/build/libdobby.a .
+          echo "✅ Dobby Framework Ready."
+
+      - name: Generate Sovereign Objective-C++ Source
+        run: |
+          cat << 'EOF_CPP' > sovereign_dylib.mm
+          #import <UIKit/UIKit.h>
+          #import <Foundation/Foundation.h>
+          #include <mach-o/dyld.h>
           #include <iostream>
-          #include <fstream>
           #include <string>
           #include <filesystem>
           #include <chrono>
           #include <thread>
           #include <iomanip>
-          #include <map>
-          #include <vector>
           #include <sstream>
+          #include <map>
+          
+          // تضمين مكتبة دوبلي القوية
+          #include "dobby.h"
 
           using namespace std;
           namespace fs = std::filesystem;
 
-          // الألوان الجمالية
-          const string GOLD   = "\033[38;5;214m";
-          const string CYAN   = "\033[38;5;51m";
-          const string GREEN  = "\033[38;5;46m";
-          const string RED    = "\033[38;5;196m";
-          const string BLUE   = "\033[38;5;39m";
-          const string DIM    = "\033[38;5;240m";
-          const string RESET  = "\033[0m";
+          // --- واجهة المستخدم العالمية ---
+          UITextView *terminalView;
+          UIView *menuView;
+          UIButton *floatingBtn;
+          UIButton *copyBtn;
 
-          struct FileSnapshot {
-              uintmax_t size;
-              fs::file_time_type last_mod;
-              string checksum;
-          };
-
-          // خوارزمية البصمة السريعة (Checksum)
-          string calculateFileChecksum(const string& filepath) {
-              ifstream file(filepath, ios::binary);
-              if (!file) return "ERROR_READING";
-              unsigned long long hash = 14695981039346656037ULL;
-              char byte;
-              while (file.get(byte)) {
-                  hash ^= (unsigned char)byte;
-                  hash *= 1099511628211ULL;
-              }
-              stringstream ss;
-              ss << hex << setfill('0') << setw(16) << hash;
-              return ss.str();
+          void PrintToScreen(string text) {
+              NSString *nsText = [NSString stringWithUTF8String:text.c_str()];
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  if (terminalView) {
+                      NSString *currentText = terminalView.text;
+                      if (currentText.length > 8000) {
+                          currentText = [currentText substringFromIndex:currentText.length - 3000];
+                      }
+                      terminalView.text = [NSString stringWithFormat:@"%@\n%@", currentText, nsText];
+                      NSRange range = NSMakeRange(terminalView.text.length, 0);
+                      [terminalView scrollRangeToVisible:range];
+                  }
+              });
           }
 
-          void writeToAuditLog(const string& logEntry) {
-              // مسار الحفظ (يمكنك تغييره لاحقاً لمسار محدد في الـ RDP الخاص بك)
-              ofstream auditFile("sovereign_audit.log", ios::app);
-              if (auditFile.is_open()) {
-                  auditFile << logEntry << endl;
-              }
-          }
-
-          // تصميم ممتد (الخدود الطويلة)
-          void printSovereignDashboard() {
-              cout << GOLD << "============================================================================================================" << endl;
-              cout << GOLD << "|| " << CYAN << "SOVEREIGN FIM ENGINE V20.0" << GOLD << " | \033[97m" << "iOS DYLIB INJECTED" << GOLD << " | \033[97m" << "ENG. WISSAM" << GOLD << " | \033[97m" << "BASRAH CYBER LABS" << GOLD << " ||" << endl;
-              cout << GOLD << "============================================================================================================" << RESET << endl;
-              cout << DIM << " [TIMESTAMP]    [EVENT TYPE]        [FILE TARGET]                       [INTEGRITY DETAILS]" << RESET << endl;
-              cout << GOLD << "------------------------------------------------------------------------------------------------------------" << RESET << endl;
-          }
-
-          void logEvent(const string& type, const string& target, const string& details, const string& color) {
+          void logEvent(string type, string target, string details) {
               auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
-              stringstream timestamp;
-              timestamp << put_time(localtime(&now), "%H:%M:%S");
-
-              cout << DIM << " [" << timestamp.str() << "] " << RESET
-                   << color << left << setw(19) << ("[" + type + "]") << RESET
-                   << left << setw(35) << target 
-                   << color << details << RESET << endl;
-
-              string rawLog = "[" + timestamp.str() + "] [" + type + "] Target: " + target + " | Details: " + details;
-              writeToAuditLog(rawLog);
+              stringstream ss;
+              ss << put_time(localtime(&now), "%H:%M:%S");
+              string logMsg = "[" + ss.str() + "] [" + type + "] " + target + " -> " + details;
+              PrintToScreen(logMsg);
           }
 
-          // المحرك الرئيسي
-          void runForensicMonitor() {
-              string directory = "."; // راقب المسار الحالي الذي تم حقن الدايلب فيه
-              map<string, FileSnapshot> snapshotDB;
-              string mainTarget = "ShadowTrackerExtra";
+          // =========================================================================
+          // 🎯 قسم المهندس وسام لإضافة الاوفسات (DOBBY HOOKS)
+          // =========================================================================
 
-              logEvent("DYLIB_LOADED", "ENGINE", "Sovereign Module injected successfully.", CYAN);
+          // 1. دالة ذكية لحساب الـ ASLR (لكي تضع أوفست IDA مباشرة)
+          uintptr_t getRealOffset(uintptr_t ida_offset) {
+              uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
+              return slide + ida_offset;
+          }
+
+          // 2. مثال على دالة بديلة (Hook Function) للاعتراض
+          void (*orig_Tick)(void* _this, float DeltaTime);
+          void my_Tick(void* _this, float DeltaTime) {
+              // هنا يمكنك كتابة كودك الخاص، مثل تعديل السرعة أو إيقاف الحماية
+              
+              // استدعاء الدالة الأصلية حتى لا تنهار اللعبة
+              orig_Tick(_this, DeltaTime);
+          }
+
+          // 3. محرك تفعيل دوبلي
+          void setupDobbyHooks() {
+              logEvent("DOBBY", "ENGINE", "Initializing Dobby Inline Hook Framework...");
+              
+              // مثال توضيحي لكيفية الاستخدام (ضع الأوفست الحقيقي الخاص بك من IDA هنا)
+              // uintptr_t targetOffset = getRealOffset(0x10CAA0300); // UWorld::Tick
+              // DobbyHook((void*)targetOffset, (void*)my_Tick, (void**)&orig_Tick);
+              
+              logEvent("DOBBY", "STATUS", "Dobby Framework is ACTIVE and ready for offsets.");
+          }
+          // =========================================================================
+
+          // محرك المراقبة (مراقبة التنزيلات وملف الشادو)
+          void runForensicMonitor() {
+              NSString *docPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+              string directory = string([docPath UTF8String]);
+              
+              logEvent("SYS", "ENGINE", "Sovereign Initialized in Sandbox.");
+              map<string, bool> seenFiles;
 
               while (true) {
                   try {
                       for (const auto& entry : fs::directory_iterator(directory)) {
                           if (!entry.is_regular_file()) continue;
-
                           string filename = entry.path().filename().string();
-                          if (filename == "sovereign_audit.log" || filename == "sovereign_dylib.cpp") continue;
-
-                          uintmax_t current_size = fs::file_size(entry);
-                          auto current_time = fs::last_write_time(entry);
-
-                          if (snapshotDB.find(filename) == snapshotDB.end()) {
-                              string checksum = calculateFileChecksum(entry.path().string());
-                              snapshotDB[filename] = {current_size, current_time, checksum};
+                          
+                          if (seenFiles.find(filename) == seenFiles.end()) {
+                              seenFiles[filename] = true;
+                              uintmax_t size = fs::file_size(entry);
                               
-                              if (filename.find(mainTarget) != string::npos) {
-                                  logEvent("TARGET_LOCKED", filename, "New File Detected. Hash Generated.", GREEN);
+                              if (filename.find("ShadowTrackerExtra") != string::npos) {
+                                  logEvent("TARGET", filename, "Target loaded! Size: " + to_string(size) + "B");
                               } else {
-                                  logEvent("BACKGROUND_FILE", filename, "Detected Download/Asset.", BLUE);
+                                  logEvent("NEW_FILE", filename, "Downloaded in bg. Size: " + to_string(size) + "B");
                               }
-                          } 
-                          else if (snapshotDB[filename].last_mod != current_time || snapshotDB[filename].size != current_size) {
-                              string new_checksum = calculateFileChecksum(entry.path().string());
-                              if (filename.find(mainTarget) != string::npos) {
-                                  logEvent("TAMPER_DETECTED", filename, "File Modified! Hash changed.", RED);
-                              }
-                              snapshotDB[filename] = {current_size, current_time, new_checksum};
                           }
                       }
                   } catch (...) {}
-
-                  this_thread::sleep_for(chrono::seconds(2));
+                  this_thread::sleep_for(chrono::seconds(3));
               }
           }
 
-          // نقطة الإقلاع الخاصة بالـ Dylib (تعمل تلقائياً عند الحقن)
+          // --- بناء الواجهة المرئية (الخدود الطويلة) ---
+          @interface SovereignMenu : NSObject
+          + (instancetype)sharedInstance;
+          - (void)setupUI;
+          - (void)copyTerminalData;
+          @end
+
+          @implementation SovereignMenu
+          + (instancetype)sharedInstance {
+              static SovereignMenu *shared = nil;
+              static dispatch_once_t onceToken;
+              dispatch_once(&onceToken, ^{ shared = [[self alloc] init]; });
+              return shared;
+          }
+
+          - (void)setupUI {
+              UIWindow *mainWindow = [UIApplication sharedApplication].keyWindow;
+              if (!mainWindow) return;
+
+              floatingBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+              floatingBtn.frame = CGRectMake(20, 50, 50, 50);
+              floatingBtn.backgroundColor = [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:0.8]; 
+              floatingBtn.layer.cornerRadius = 25;
+              floatingBtn.layer.borderWidth = 2;
+              floatingBtn.layer.borderColor = [UIColor greenColor].CGColor;
+              [floatingBtn setTitle:@"S" forState:UIControlStateNormal];
+              [floatingBtn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
+              floatingBtn.titleLabel.font = [UIFont boldSystemFontOfSize:24];
+              [floatingBtn addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+              
+              UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragBtn:)];
+              [floatingBtn addGestureRecognizer:pan];
+
+              CGFloat width = mainWindow.bounds.size.width * 0.85; 
+              CGFloat height = mainWindow.bounds.size.height * 0.45;
+              menuView = [[UIView alloc] initWithFrame:CGRectMake((mainWindow.bounds.size.width - width)/2, 60, width, height)];
+              menuView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.9];
+              menuView.layer.cornerRadius = 8;
+              menuView.layer.borderWidth = 2;
+              menuView.layer.borderColor = [UIColor redColor].CGColor; 
+              menuView.hidden = YES;
+
+              UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10, 5, width - 80, 25)];
+              title.text = "[ SOVEREIGN V200K - DOBBY HOOK ACTIVE ]";
+              title.textColor = [UIColor redColor];
+              title.font = [UIFont fontWithName:@"Courier-Bold" size:12];
+              [menuView addSubview:title];
+
+              copyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+              copyBtn.frame = CGRectMake(width - 65, 5, 55, 25);
+              copyBtn.backgroundColor = [UIColor colorWithRed:0.0 green:0.3 blue:0.0 alpha:1.0];
+              copyBtn.layer.borderWidth = 1;
+              copyBtn.layer.borderColor = [UIColor greenColor].CGColor;
+              [copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
+              [copyBtn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
+              copyBtn.titleLabel.font = [UIFont fontWithName:@"Courier-Bold" size:12];
+              [copyBtn addTarget:self action:@selector(copyTerminalData) forControlEvents:UIControlEventTouchUpInside];
+              [menuView addSubview:copyBtn];
+
+              UIView *separator = [[UIView alloc] initWithFrame:CGRectMake(0, 35, width, 1)];
+              separator.backgroundColor = [UIColor redColor];
+              [menuView addSubview:separator];
+
+              terminalView = [[UITextView alloc] initWithFrame:CGRectMake(5, 40, width - 10, height - 45)];
+              terminalView.backgroundColor = [UIColor clearColor];
+              terminalView.textColor = [UIColor cyanColor]; 
+              terminalView.font = [UIFont fontWithName:@"Courier" size:11];
+              terminalView.editable = NO;
+              terminalView.selectable = YES; 
+              [menuView addSubview:terminalView];
+
+              [mainWindow addSubview:menuView];
+              [mainWindow addSubview:floatingBtn];
+              
+              PrintToScreen("============================================");
+              PrintToScreen("  SOVEREIGN MONITOR + DOBBY ENGINE INJECTED");
+              PrintToScreen("  DEVELOPER: ENG. WISSAM (BASRAH CYBER LABS)");
+              PrintToScreen("============================================");
+              
+              // تشغيل محركات المراقبة والدوبلي
+              setupDobbyHooks();
+              std::thread(runForensicMonitor).detach();
+          }
+
+          - (void)toggleMenu {
+              menuView.hidden = !menuView.hidden;
+          }
+
+          - (void)copyTerminalData {
+              UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+              pasteboard.string = terminalView.text;
+              
+              [copyBtn setTitle:@"OK!" forState:UIControlStateNormal];
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                  [copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
+              });
+          }
+
+          - (void)dragBtn:(UIPanGestureRecognizer *)recognizer {
+              UIView *view = recognizer.view;
+              CGPoint translation = [recognizer translationInView:view.superview];
+              view.center = CGPointMake(view.center.x + translation.x, view.center.y + translation.y);
+              [recognizer setTranslation:CGPointZero inView:view.superview];
+          }
+          @end
+
           __attribute__((constructor))
           void onSovereignInject() {
-              printSovereignDashboard();
-              writeToAuditLog("==================================================");
-              writeToAuditLog("DYLIB INJECTED: ENG. WISSAM SOVEREIGN ENGINE");
-              writeToAuditLog("==================================================");
-              
-              // تشغيل المحرك في Thread منفصل لكي لا يسبب كراش للعبة
-              std::thread(runForensicMonitor).detach();
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                  [[SovereignMenu sharedInstance] setupUI];
+              });
           }
           EOF_CPP
 
-      - name: Compile as Dynamic Library (.dylib)
+      - name: Compile Objective-C++ Dylib with Dobby (arm64)
         run: |
-          echo "🔥 Building Sovereign Pro Dylib..."
-          # استخدام علم -dynamiclib لتحويل الكود إلى مكتبة دايلب لآبل
-          clang++ -std=c++17 -O3 -dynamiclib sovereign_dylib.cpp -o SovereignEngine.dylib
-          echo "✅ Dylib Compilation Successful."
+          echo "🔥 Building Sovereign Visual Dylib + Dobby for iPhone..."
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          
+          # دمج كود الواجهة مع مكتبة Dobby الثابتة (libdobby.a)
+          clang++ -x objective-c++ -std=c++17 -arch arm64 -isysroot $IOS_SDK -miphoneos-version-min=12.0 -fobjc-arc -dynamiclib -framework Foundation -framework UIKit -L. -ldobby sovereign_dylib.mm -o SovereignEngine.dylib
+          
+          echo "✅ Compilation Successful!"
 
-      - name: Upload Dylib Artifact for Download
+      - name: Upload iOS Dylib Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SovereignEngine-Dylib
+          name: Sovereign-Dobby-Dylib
           path: SovereignEngine.dylib
           retention-days: 5
