@@ -1,101 +1,120 @@
+name: Sovereign-Dolphin-Forge-v20
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:  # يمكن تشغيله يدويًا من GitHub
+
+jobs:
+  build:
+    name: Compiling Sovereign Elite X v20
+    runs-on: macos-latest  # يعمل على بيئة macOS
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4  # سحب الكود من مستودع GitHub
+
+      - name: Generate and Compile Sovereign Core
+        run: |
+          echo "🔥 Starting Sovereign Dolphin Forge v20.0 (Version 4.2.0)..."
+          
+          # إعداد بيئة البناء باستخدام CMake أو Makefile حسب الحاجة
+          echo "🔧 Building with CMake..."
+          cmake .
+          make
+
+      - name: Run the Game Monitor executable
+        run: |
+          ./file_monitor  # يشغل السكربت الذي تم بناؤه بعد CMake أو Makefile
+
+      - name: Clean up build files
+        run: |
+          make clean  # تنظيف الملفات المترجمة بعد الانتهاء من البناء (اختياري)
+          
+---
+
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <unistd.h>
-#include <mach/mach.h>
-#include <mach-o/dyld.h>
-#include <dlfcn.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 using namespace std;
 
 // دالة لعرض الرسائل مع تمييز الألوان
 void printWithColor(const string& msg, const string& color) {
-    // إضافة تلوين للرسائل حسب نوع الحدث
-    if (color == "info") {
-        cout << "\033[34m[INFO] " << msg << "\033[0m" << endl;
-    } else if (color == "success") {
-        cout << "\033[32m[SUCCESS] " << msg << "\033[0m" << endl;
-    } else if (color == "error") {
-        cout << "\033[31m[ERROR] " << msg << "\033[0m" << endl;
-    } else if (color == "event") {
-        cout << "\033[33m[EVENT] " << msg << "\033[0m" << endl;
+    if (color == "blue") {
+        cout << "\033[34m" << msg << "\033[0m" << endl;
+    } else if (color == "green") {
+        cout << "\033[32m" << msg << "\033[0m" << endl;
+    } else if (color == "red") {
+        cout << "\033[31m" << msg << "\033[0m" << endl;
+    } else if (color == "yellow") {
+        cout << "\033[33m" << msg << "\033[0m" << endl;
     } else {
         cout << msg << endl;
     }
 }
 
-// دالة لمراقبة فتح أو قراءة الملفات (مثل ملف Shadow)
-void monitorFileAccess(const string& filePath) {
-    printWithColor("مراقبة الوصول إلى الملف: " + filePath, "info");
-    
-    // فتح الملف والتحقق إذا كان قابلاً للقراءة
-    ifstream file(filePath, ios::in | ios::binary);
-    if (file.is_open()) {
-        printWithColor("تم فتح الملف بنجاح: " + filePath, "success");
-        
-        // قراءة البيانات في الملف (مثلاً البيانات التي تتعلق بالملفات المحفوظة)
-        char buffer[256];
-        while (file.read(buffer, sizeof(buffer))) {
-            printWithColor("البيانات المقروءة: " + string(buffer), "event");
+// دالة للبحث في المسار ومراقبة الملفات
+void monitorFilePath(const string& searchDir, const string& targetFile) {
+    DIR* dir;
+    struct dirent* entry;
+
+    // فتح الدليل (المسار)
+    if ((dir = opendir(searchDir.c_str())) != NULL) {
+        // مسح جميع الملفات والمجلدات في الدليل
+        while ((entry = readdir(dir)) != NULL) {
+            // تخطي . و ..
+            if (string(entry->d_name) == "." || string(entry->d_name) == "..") {
+                continue;
+            }
+
+            string filePath = searchDir + "/" + entry->d_name;
+            struct stat statBuf;
+
+            // التحقق من نوع الملف (إذا كان ملفًا عاديًا أو مجلدًا)
+            if (stat(filePath.c_str(), &statBuf) == 0) {
+                if (S_ISREG(statBuf.st_mode)) {
+                    // إذا كان الملف عاديًا، قم بمراقبته
+                    if (filePath.find(targetFile) != string::npos) {
+                        printWithColor("تم العثور على الملف: " + filePath, "green");
+                        
+                        // هنا يمكنك إضافة الكود لقراءة الملف أو تنفيذ عمليات أخرى
+                        ifstream file(filePath);
+                        if (file.is_open()) {
+                            string line;
+                            while (getline(file, line)) {
+                                printWithColor("البيانات في الملف: " + line, "yellow");
+                            }
+                            file.close();
+                        }
+                    }
+                } else if (S_ISDIR(statBuf.st_mode)) {
+                    // إذا كان المجلد، قم بالبحث فيه
+                    monitorFilePath(filePath, targetFile);  // استدعاء دالة البحث بشكل متكرر للمجلدات
+                }
+            }
         }
-        file.close();
+        closedir(dir);
     } else {
-        printWithColor("فشل في فتح الملف: " + filePath, "error");
+        // في حالة فشل فتح الدليل
+        printWithColor("فشل في فتح المسار: " + searchDir, "red");
     }
-}
-
-// دالة لفحص الأوفستات في الذاكرة (التي يمكن أن تكون مرتبطة بملفات اللعبة)
-void monitorOffsets() {
-    printWithColor("مراقبة الأوفستات في الذاكرة...", "info");
-
-    // مثال على مراقبة الأوفستات من خلال تحميل مكتبة ديناميكية (الذاكرة)
-    void* baseAddr = dlopen("libshadow.dylib", RTLD_LAZY);
-    if (baseAddr != NULL) {
-        printWithColor("تم العثور على المكتبة عند العنوان: " + to_string(reinterpret_cast<uintptr_t>(baseAddr)), "success");
-    } else {
-        printWithColor("فشل في العثور على المكتبة!", "error");
-    }
-
-    // محاكاة تتبع الأوفستات في الذاكرة
-    uintptr_t targetOffset = reinterpret_cast<uintptr_t>(baseAddr) + 0x12345; // مثال لأوفست في الذاكرة
-    printWithColor("تتبع أوفست الذاكرة عند العنوان: " + to_string(targetOffset), "event");
-
-    // يمكن هنا إضافة أي من الدوال لتعقب التغيرات في هذا الأوفست
-}
-
-// دالة لفحص الذاكرة باستخدام scan قوي
-void scanMemory() {
-    printWithColor("بدأ مسح الذاكرة...", "info");
-
-    // مسح الذاكرة الديناميكية هنا باستخدام تقنيات معينة (هذه طريقة افتراضية)
-    uintptr_t startAddress = 0x10000000; // البداية الافتراضية
-    uintptr_t endAddress = 0x20000000;   // النهاية الافتراضية
-
-    for (uintptr_t addr = startAddress; addr < endAddress; addr += 0x1000) {
-        // استخدام دالة scan لقراءة الذاكرة هنا (مراقبة التغيرات)
-        printWithColor("مسح الذاكرة عند العنوان: " + to_string(addr), "event");
-
-        // في بيئة حقيقية، يمكنك استخدام دالة خاصة لقراءة الذاكرة في هذا العنوان
-    }
-}
-
-// الواجهة الرئيسية التي تبدأ المراقبة
-void startMonitoring() {
-    printWithColor("بدء المراقبة...", "info");
-
-    // مراقبة ملفات اللعبة (مثال لملف Shadow)
-    string shadowFilePath = "/path/to/shadow_file";
-    monitorFileAccess(shadowFilePath);
-
-    // مراقبة الأوفستات
-    monitorOffsets();
-
-    // مسح الذاكرة (scan) في اللعبة
-    scanMemory();
 }
 
 int main() {
-    // بدء عملية المراقبة
-    startMonitoring();
+    // تحديد المسار الذي تريد البحث فيه (يمكنك تخصيص المسار الخاص بك هنا)
+    string searchDir = "/var/mobile/Containers/Data/Application";  // المسار الذي يحتوي على التطبيقات في جهاز iOS
+
+    // اسم الملف الذي نبحث عنه
+    string targetFile = "ShadowTrackerExtra";
+
+    // البدء بمراقبة المسار
+    printWithColor("ابدأ البحث عن الملف: " + targetFile, "blue");
+    monitorFilePath(searchDir, targetFile);  // بدء البحث في المجلد
+
     return 0;
 }
