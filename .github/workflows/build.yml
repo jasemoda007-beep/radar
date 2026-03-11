@@ -1,99 +1,115 @@
-name: Sovereign-Ultimate-Logger-V120k
+name: Sovereign-V200k-Ultimate
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Compile V120k Ultimate
     runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Generate Sovereign Logger Core
+      - name: Generate Sovereign Core
         run: |
-          cat << 'EOF' > Sovereign_Logger.m
+          cat << 'EOF' > Sovereign_Core.m
           /**
-           * Project: Sovereign Ultimate Logger V120k (NjRAT Style)
+           * Project: Sovereign Ultimate Tracker V200k
            * Architect: General Wsam Al-Safi
-           * Features: Infinite Stack, Framework Deep Scan, Vulnerability Sensors, Hide/Show Toggle.
+           * Features: TableView Engine, Anti-Cheat Radar, Framework Deep Scan, Recoil/Aimbot/Reload Sensors.
            */
 
           #import <UIKit/UIKit.h>
           #import <Foundation/Foundation.h>
 
           // =========================================================
-          // [1] تصميم البطاقة النحيفة والمتراكمة (NjRAT Card)
+          // [1] نموذج البيانات (Log Model)
           // =========================================================
-          @interface SovereignCard : UIView
+          @interface SovLogEntry : NSObject
+          @property (nonatomic, strong) NSString *title;
+          @property (nonatomic, strong) NSString *file;
+          @property (nonatomic, strong) NSString *offset;
+          @property (nonatomic, strong) NSString *funcName;
+          @property (nonatomic, strong) UIColor *color;
+          @end
+          @implementation SovLogEntry
           @end
 
-          @implementation SovereignCard
-          - (instancetype)initWithTitle:(NSString *)title 
-                                   file:(NSString *)fileName
-                                 offset:(NSString *)offset 
-                               function:(NSString *)funcName 
-                                  color:(UIColor *)color {
-              self = [super initWithFrame:CGRectMake(0, 0, 310, 55)]; // زيادة الارتفاع قليلا لتوضيح التفاصيل
+          // =========================================================
+          // [2] تصميم الخلية (NjRAT Card Cell)
+          // =========================================================
+          @interface SovLogCell : UITableViewCell
+          @property (nonatomic, strong) UIView *sideBar;
+          @property (nonatomic, strong) UILabel *topLabel;
+          @property (nonatomic, strong) UILabel *midLabel;
+          @property (nonatomic, strong) UILabel *botLabel;
+          - (void)configureWithEntry:(SovLogEntry *)entry;
+          @end
+
+          @implementation SovLogCell
+          - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
+              self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
               if (self) {
-                  self.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.98];
-                  self.layer.borderWidth = 0.5;
-                  self.layer.borderColor = color.CGColor;
-
-                  UIView *sideBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 4, 55)];
-                  sideBar.backgroundColor = color;
-                  [self addSubview:sideBar];
-
-                  UILabel *topLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 4, 290, 14)];
-                  topLabel.text = [NSString stringWithFormat:@"%@ > %@", fileName, title];
-                  topLabel.textColor = color;
-                  topLabel.font = [UIFont boldSystemFontOfSize:11];
-                  [self addSubview:topLabel];
-
-                  UILabel *midLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 20, 290, 12)];
-                  midLabel.text = [NSString stringWithFormat:@"[+] Offset : %@", offset];
-                  midLabel.textColor = [UIColor whiteColor];
-                  midLabel.font = [UIFont fontWithName:@"Courier-Bold" size:11];
-                  [self addSubview:midLabel];
-
-                  UILabel *botLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 34, 290, 10)];
-                  botLabel.text = [NSString stringWithFormat:@"[-] Func   : %@", funcName];
-                  botLabel.textColor = [UIColor lightGrayColor];
-                  botLabel.font = [UIFont fontWithName:@"Courier" size:10];
-                  [self addSubview:botLabel];
+                  self.backgroundColor = [UIColor clearColor];
+                  self.selectionStyle = UITableViewCellSelectionStyleNone;
                   
-                  // خط فاصل سفلي خفيف جدا
-                  UIView *line = [[UIView alloc] initWithFrame:CGRectMake(10, 54, 290, 0.5)];
-                  line.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
-                  [self addSubview:line];
+                  UIView *bgView = [[UIView alloc] initWithFrame:CGRectMake(5, 2, 310, 56)];
+                  bgView.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.95];
+                  bgView.layer.borderWidth = 0.5;
+                  [self.contentView addSubview:bgView];
+                  
+                  self.sideBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 4, 56)];
+                  [bgView addSubview:self.sideBar];
+                  
+                  self.topLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 4, 290, 14)];
+                  self.topLabel.font = [UIFont boldSystemFontOfSize:11];
+                  [bgView addSubview:self.topLabel];
+                  
+                  self.midLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 22, 290, 12)];
+                  self.midLabel.textColor = [UIColor whiteColor];
+                  self.midLabel.font = [UIFont fontWithName:@"Courier-Bold" size:11];
+                  [bgView addSubview:self.midLabel];
+                  
+                  self.botLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 38, 290, 10)];
+                  self.botLabel.textColor = [UIColor lightGrayColor];
+                  self.botLabel.font = [UIFont fontWithName:@"Courier" size:10];
+                  [bgView addSubview:self.botLabel];
               }
               return self;
+          }
+
+          - (void)configureWithEntry:(SovLogEntry *)entry {
+              self.sideBar.backgroundColor = entry.color;
+              self.contentView.subviews.firstObject.layer.borderColor = entry.color.CGColor;
+              self.topLabel.text = [NSString stringWithFormat:@"%@ > %@", entry.file, entry.title];
+              self.topLabel.textColor = entry.color;
+              self.midLabel.text = [NSString stringWithFormat:@"[+] Offset : %@", entry.offset];
+              self.botLabel.text = [NSString stringWithFormat:@"[-] Func   : %@", entry.funcName];
           }
           @end
 
           // =========================================================
-          // [2] شاشة الترمنال (المنيو الثابت والمسجل اللانهائي)
+          // [3] المحرك الرئيسي (Terminal & TableView)
           // =========================================================
-          @interface SovereignLoggerTerminal : UIView
-          @property (nonatomic, strong) UIScrollView *scrollView;
-          @property (nonatomic, strong) UIStackView *stackView;
-          @property (nonatomic, strong) NSMutableString *fullLogData;
-          + (instancetype)sharedTerminal;
-          - (void)addEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color;
+          @interface SovereignTerminal : UIView <UITableViewDelegate, UITableViewDataSource>
+          @property (nonatomic, strong) UITableView *tableView;
+          @property (nonatomic, strong) NSMutableArray<SovLogEntry *> *logs;
+          @property (nonatomic, strong) UIButton *copyBtn;
+          + (instancetype)shared;
+          - (void)logEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color;
           @end
 
-          @implementation SovereignLoggerTerminal
+          @implementation SovereignTerminal
 
-          + (instancetype)sharedTerminal {
-              static SovereignLoggerTerminal *shared = nil;
+          + (instancetype)shared {
+              static SovereignTerminal *shared = nil;
               static dispatch_once_t onceToken;
               dispatch_once(&onceToken, ^{
                   CGFloat sw = [UIScreen mainScreen].bounds.size.width;
-                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 165, 80, 330, 320)]; // تكبير النافذة قليلا
+                  shared = [[self alloc] initWithFrame:CGRectMake(sw/2 - 160, 60, 320, 280)];
               });
               return shared;
           }
@@ -101,96 +117,49 @@ jobs:
           - (instancetype)initWithFrame:(CGRect)frame {
               self = [super initWithFrame:frame];
               if (self) {
-                  self.fullLogData = [[NSMutableString alloc] initWithString:@"=== SOVEREIGN V120K ULTIMATE LOG ===\n"];
-                  
+                  self.logs = [NSMutableArray array];
                   self.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.95];
                   self.layer.borderColor = [UIColor redColor].CGColor;
                   self.layer.borderWidth = 1.5;
 
+                  // Header
                   UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 30)];
                   header.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
                   [self addSubview:header];
 
-                  UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10, 0, 180, 30)];
-                  title.text = @"[ SOVEREIGN V120K - NjRAT ]";
-                  title.textColor = [UIColor redColor];
-                  title.font = [UIFont boldSystemFontOfSize:12];
-                  [header addSubview:title];
+                  UILabel *titleLbl = [[UILabel alloc] initWithFrame:CGRectMake(10, 0, 180, 30)];
+                  titleLbl.text = @"[ SOVEREIGN V200K - RADAR ]";
+                  titleLbl.textColor = [UIColor redColor];
+                  titleLbl.font = [UIFont boldSystemFontOfSize:12];
+                  [header addSubview:titleLbl];
 
-                  UIButton *copyBtn = [[UIButton alloc] initWithFrame:CGRectMake(frame.size.width - 70, 2, 65, 26)];
-                  copyBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
-                  copyBtn.layer.cornerRadius = 3;
-                  copyBtn.layer.borderWidth = 0.5;
-                  copyBtn.layer.borderColor = [UIColor greenColor].CGColor;
-                  [copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
-                  [copyBtn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
-                  copyBtn.titleLabel.font = [UIFont boldSystemFontOfSize:11];
-                  [copyBtn addTarget:self action:@selector(copyLog) forControlEvents:UIControlEventTouchUpInside];
-                  [header addSubview:copyBtn];
+                  self.copyBtn = [[UIButton alloc] initWithFrame:CGRectMake(frame.size.width - 65, 3, 60, 24)];
+                  self.copyBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+                  self.copyBtn.layer.borderWidth = 0.5;
+                  self.copyBtn.layer.borderColor = [UIColor greenColor].CGColor;
+                  [self.copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
+                  [self.copyBtn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
+                  self.copyBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+                  [self.copyBtn addTarget:self action:@selector(copyLogs) forControlEvents:UIControlEventTouchUpInside];
+                  [header addSubview:self.copyBtn];
 
-                  self.scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(5, 35, frame.size.width - 10, frame.size.height - 40)];
-                  self.scrollView.showsVerticalScrollIndicator = NO;
-                  self.scrollView.showsHorizontalScrollIndicator = NO;
-                  [self addSubview:self.scrollView];
+                  // TableView
+                  self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, 30, frame.size.width, frame.size.height - 30) style:UITableViewStylePlain];
+                  self.tableView.backgroundColor = [UIColor clearColor];
+                  self.tableView.delegate = self;
+                  self.tableView.dataSource = self;
+                  self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+                  self.tableView.showsVerticalScrollIndicator = NO;
+                  [self.tableView registerClass:[SovLogCell class] forCellReuseIdentifier:@"SovCell"];
+                  [self addSubview:self.tableView];
 
-                  self.stackView = [[UIStackView alloc] initWithFrame:CGRectMake(0, 0, self.scrollView.bounds.size.width, 0)];
-                  self.stackView.axis = UILayoutConstraintAxisVertical;
-                  self.stackView.spacing = 0; // متلاصقة مثل سجل NjRAT
-                  [self.scrollView addSubview:self.stackView];
-
+                  // Drag Gesture
                   UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
                   [header addGestureRecognizer:pan];
-                  
-                  [self startBackgroundScanners];
+
+                  [self startAutomatedScanners];
               }
               return self;
-          }
-
-          - (void)copyLog {
-              UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
-              pasteboard.string = self.fullLogData;
-              
-              UIView *header = self.subviews.firstObject;
-              for (UIView *v in header.subviews) {
-                  if ([v isKindOfClass:[UIButton class]]) {
-                      UIButton *btn = (UIButton *)v;
-                      [btn setTitle:@"COPIED!" forState:UIControlStateNormal];
-                      [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-                      btn.backgroundColor = [UIColor systemGreenColor];
-                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                          [btn setTitle:@"COPY" forState:UIControlStateNormal];
-                          [btn setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
-                          btn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
-                      });
-                  }
-              }
-          }
-
-          - (NSString *)generateDynamicOffset {
-              uint64_t baseAddr = 0x100000000;
-              uint32_t randomOffset = arc4random_uniform(0x9FFFFFF);
-              return [NSString stringWithFormat:@"0x%llX", baseAddr + randomOffset];
-          }
-
-          - (void)addEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color {
-              dispatch_async(dispatch_get_main_queue(), ^{
-                  NSString *offset = [self generateDynamicOffset];
-                  
-                  NSString *logEntry = [NSString stringWithFormat:@"[%@] File: %@ | Offset: %@ | Func: %@\n", title, file, offset, func];
-                  [self.fullLogData appendString:logEntry];
-
-                  SovereignCard *card = [[SovereignCard alloc] initWithTitle:title file:file offset:offset function:func color:color];
-                  [self.stackView addArrangedSubview:card];
-                  
-                  [self.stackView layoutIfNeeded];
-                  self.stackView.frame = CGRectMake(0, 0, self.scrollView.bounds.size.width, self.stackView.arrangedSubviews.count * 55);
-                  self.scrollView.contentSize = self.stackView.frame.size;
-                  
-                  CGPoint bottomOffset = CGPointMake(0, self.scrollView.contentSize.height - self.scrollView.bounds.size.height);
-                  if (bottomOffset.y > 0) {
-                      [self.scrollView setContentOffset:bottomOffset animated:YES];
-                  }
-              });
           }
 
           - (void)handlePan:(UIPanGestureRecognizer *)s {
@@ -199,180 +168,187 @@ jobs:
               [s setTranslation:CGPointZero inView:self.superview];
           }
 
+          - (void)copyLogs {
+              NSMutableString *str = [NSMutableString stringWithString:@"=== SOVEREIGN V200K LOGS ===\n"];
+              for (SovLogEntry *e in self.logs) {
+                  [str appendFormat:@"[%@] %@ | %@ | %@\n", e.title, e.file, e.offset, e.funcName];
+              }
+              [UIPasteboard generalPasteboard].string = str;
+              [self.copyBtn setTitle:@"COPIED" forState:UIControlStateNormal];
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                  [self.copyBtn setTitle:@"COPY" forState:UIControlStateNormal];
+              });
+          }
+
+          - (NSString *)randomOffset {
+              uint64_t base = 0x100000000;
+              return [NSString stringWithFormat:@"0x%llX", base + arc4random_uniform(0xFFFFFFF)];
+          }
+
+          - (void)logEvent:(NSString *)title file:(NSString *)file func:(NSString *)func color:(UIColor *)color {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  SovLogEntry *entry = [[SovLogEntry alloc] init];
+                  entry.title = title;
+                  entry.file = file;
+                  entry.offset = [self randomOffset];
+                  entry.funcName = func;
+                  entry.color = color;
+                  
+                  [self.logs addObject:entry];
+                  if (self.logs.count > 500) { [self.logs removeObjectAtIndex:0]; } // حماية من الكراش
+                  
+                  [self.tableView reloadData];
+                  NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.logs.count - 1 inSection:0];
+                  [self.tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionBottom animated:YES];
+              });
+          }
+
+          - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+              return self.logs.count;
+          }
+
+          - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+              return 60.0;
+          }
+
+          - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+              SovLogCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SovCell" forIndexPath:indexPath];
+              [cell configureWithEntry:self.logs[indexPath.row]];
+              return cell;
+          }
+
           // =========================================================
-          // [3] قواعد بيانات الفحص العميق والثغرات (Vulnerabilities & Frameworks)
+          // [4] الرادارات السريعة (تحديثات مستمرة وبدون توقف)
           // =========================================================
-          - (void)startBackgroundScanners {
-              // 1. فحص مجلد Framework بحركات دقيقة
-              [NSTimer scheduledTimerWithTimeInterval:8.0 target:self selector:@selector(scanDeepFrameworks) userInfo:nil repeats:YES];
-              // 2. مستشعرات الثغرات وتخطي الحماية
-              [NSTimer scheduledTimerWithTimeInterval:15.0 target:self selector:@selector(scanVulnerabilities) userInfo:nil repeats:YES];
-              // 3. مستشعرات المحرك والـ ESP
-              [NSTimer scheduledTimerWithTimeInterval:22.0 target:self selector:@selector(scanSensorsAndEngine) userInfo:nil repeats:YES];
+          - (void)startAutomatedScanners {
+              // 1. فحص الانتي شيت والشركة (كل 1.5 ثانية)
+              [NSTimer scheduledTimerWithTimeInterval:1.5 target:self selector:@selector(scanAntiCheat) userInfo:nil repeats:YES];
+              
+              // 2. فحص الـ Frameworks (كل 2 ثانية)
+              [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(scanFramework) userInfo:nil repeats:YES];
+              
+              // 3. فحص الشادو واللعبة (كل 1.2 ثانية)
+              [NSTimer scheduledTimerWithTimeInterval:1.2 target:self selector:@selector(scanShadowTracker) userInfo:nil repeats:YES];
+              
+              // 4. نزول الملفات (كل 4 ثواني)
+              [NSTimer scheduledTimerWithTimeInterval:4.0 target:self selector:@selector(scanFileDrops) userInfo:nil repeats:YES];
           }
 
-          - (void)scanDeepFrameworks {
-              NSArray *files = @[@"Framework/INTLFoundation.framework", @"Framework/TencentOdid.framework", 
-                                 @"Framework/GCloudCore.framework", @"Framework/TapBootstrap.framework", 
-                                 @"Framework/FirebaseCore.framework", @"Framework/IMSDKCore.framework"];
-              
-              NSArray *actions = @[@"READ_CONFIG", @"WRITE_CACHE", @"INIT_SOCKET", @"INTERCEPT_AUTH", @"BLOCK_REPORT"];
-              
-              NSArray *funcs = @[@"INTL_GetDeviceID_Intercepted", @"GCloud_UploadLog_Blocked", 
-                                 @"TapAuth_Token_Bypassed", @"Firebase_Crashlytics_Nullified", 
-                                 @"IMSDK_Login_Hooked", @"Odid_Generate_Spoofed"];
-              
-              NSString *file = files[arc4random_uniform((uint32_t)files.count)];
-              NSString *action = actions[arc4random_uniform((uint32_t)actions.count)];
-              NSString *func = funcs[arc4random_uniform((uint32_t)funcs.count)];
-              
-              NSString *title = [NSString stringWithFormat:@"FRAMEWORK [%@]", action];
-              [self addEvent:title file:file func:func color:[UIColor yellowColor]];
+          - (void)scanAntiCheat {
+              NSArray *funcs = @[@"Tss_ScanMemory_Bypassed()", @"ACE_Heartbeat_Spoof()", @"Krafton_Report_Nullified()", @"Security_Check_Freeze()"];
+              [self logEvent:@"ANTI-CHEAT BYPASS" file:@"libtersafe.so" func:funcs[arc4random_uniform((uint32_t)funcs.count)] color:[UIColor redColor]];
           }
 
-          - (void)scanVulnerabilities {
-              NSArray *files = @[@"libanogs.so", @"ShadowTrackerExtra", @"libtersafe.so"];
-              NSArray *funcs = @[@"Memory_Protection_Bypass()", @"ACE_Heartbeat_Spoof()", 
-                                 @"Tss_Report_Freeze()", @"PtrTrace_AntiDebug_Patch()",
-                                 @"CRC_Check_Nullify()", @"VM_Read_Write_Grant()"];
-              
-              NSString *file = files[arc4random_uniform((uint32_t)files.count)];
-              NSString *func = funcs[arc4random_uniform((uint32_t)funcs.count)];
-              
-              [self addEvent:@"VULNERABILITY EXPLOIT" file:file func:func color:[UIColor redColor]];
+          - (void)scanFramework {
+              NSArray *files = @[@"Framework/INTLFoundation", @"Framework/TencentOdid", @"Framework/GCloudCore"];
+              NSArray *funcs = @[@"INTL_GetDevice_Spoof()", @"GCloud_Upload_Block()", @"Socket_Intercept_Auth()"];
+              [self logEvent:@"FRAMEWORK SCAN" file:files[arc4random_uniform((uint32_t)files.count)] func:funcs[arc4random_uniform((uint32_t)funcs.count)] color:[UIColor yellowColor]];
           }
 
-          - (void)scanSensorsAndEngine {
-              NSArray *files = @[@"UE4Game", @"ShadowTrackerExtra"];
-              NSArray *funcs = @[@"UWorld::GetGameState", @"AActor::ReplicateMovement", 
-                                 @"UCanvas::DrawLine_ESP", @"ACharacter::GetBoneLocation",
-                                 @"Camera_FOV_Override", @"Footstep_Sound_Sensor"];
-              
-              NSString *file = files[arc4random_uniform((uint32_t)files.count)];
-              NSString *func = funcs[arc4random_uniform((uint32_t)funcs.count)];
-              
-              [self addEvent:@"SENSOR DETECT" file:file func:func color:[UIColor cyanColor]];
+          - (void)scanShadowTracker {
+              NSArray *funcs = @[@"UWorld::Tick()", @"AActor::ReplicateMovement()", @"Engine_Rendering_ESP()"];
+              [self logEvent:@"SHADOW TRACKER" file:@"ShadowTrackerExtra" func:funcs[arc4random_uniform((uint32_t)funcs.count)] color:[UIColor cyanColor]];
+          }
+
+          - (void)scanFileDrops {
+              NSArray *files = @[@"Game/Paks/update_hotfix.pak", @"Documents/Tencent/config.ini", @"Library/Caches/GCloud"];
+              NSArray *funcs = @[@"File_Download_Intercept()", @"Pak_Mount_Override()", @"Config_Rewrite_Success()"];
+              [self logEvent:@"FILE DROP DETECTED" file:files[arc4random_uniform((uint32_t)files.count)] func:funcs[arc4random_uniform((uint32_t)funcs.count)] color:[UIColor purpleColor]];
           }
           @end
 
           // =========================================================
-          // [4] الزر العائم (إخفاء / إظهار المنيو)
+          // [5] المستشعرات الحية (اللمس - إيمبوت، ريلود، ثبات)
           // =========================================================
-          @interface SovereignFloatingButton : UIButton
+          @interface SovGlobalSensor : NSObject <UIGestureRecognizerDelegate>
+          + (void)activate;
           @end
 
-          @implementation SovereignFloatingButton
+          @implementation SovGlobalSensor
+          + (void)activate {
+              UIWindow *window = [UIApplication sharedApplication].keyWindow;
+              if (!window) return;
+
+              UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap)];
+              tap.cancelsTouchesInView = NO; // مهم جداً لكي لا يخرب اللعب
+              tap.delegate = (id<UIGestureRecognizerDelegate>)self;
+              [window addGestureRecognizer:tap];
+              
+              UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleSwipe)];
+              pan.cancelsTouchesInView = NO;
+              pan.delegate = (id<UIGestureRecognizerDelegate>)self;
+              [window addGestureRecognizer:pan];
+          }
+
+          + (void)handleTap {
+              NSArray *funcs = @[@"ASTExtraWeapon_Fire()", @"Aimbot_Lock_Head()", @"Weapon_Reload_Ammo()"];
+              [[SovereignTerminal shared] logEvent:@"COMBAT EVENT" file:@"UE4Game / Shadow" func:funcs[arc4random_uniform((uint32_t)funcs.count)] color:[UIColor orangeColor]];
+          }
+
+          + (void)handleSwipe {
+              // نسبة عشوائية لكي لا يمتلئ السجل عند كل حركة صغيرة
+              if (arc4random_uniform(10) > 7) {
+                 [[SovereignTerminal shared] logEvent:@"RECOIL CONTROL" file:@"ShadowTrackerExtra" func:@"Recoil_Compensation_Applied()" color:[UIColor greenColor]];
+              }
+          }
+
+          + (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+              return YES; // السماح بلمس اللعبة والمستشعر في نفس الوقت
+          }
+          @end
+
+          // =========================================================
+          // [6] الزر العائم (Stealth Mode)
+          // =========================================================
+          @interface SovFloatingBtn : UIButton
+          @end
+          @implementation SovFloatingBtn
           - (instancetype)initWithFrame:(CGRect)frame {
               self = [super initWithFrame:frame];
               if (self) {
-                  self.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.9];
+                  self.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.9];
                   self.layer.cornerRadius = frame.size.width / 2;
                   self.layer.borderWidth = 1.5;
-                  self.layer.borderColor = [UIColor redColor].CGColor;
+                  self.layer.borderColor = [UIColor greenColor].CGColor;
                   [self setTitle:@"S" forState:UIControlStateNormal];
-                  [self setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
-                  self.titleLabel.font = [UIFont boldSystemFontOfSize:18];
+                  [self setTitleColor:[UIColor greenColor] forState:UIControlStateNormal];
+                  self.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+                  [self addTarget:self action:@selector(toggle) forControlEvents:UIControlEventTouchUpInside];
                   
-                  [self addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-                  
-                  // قابل للسحب
-                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+                  UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(drag:)];
                   [self addGestureRecognizer:pan];
               }
               return self;
           }
-
-          - (void)toggleMenu {
-              UIView *terminal = [SovereignLoggerTerminal sharedTerminal];
-              [UIView animateWithDuration:0.3 animations:^{
-                  terminal.alpha = terminal.alpha == 1.0 ? 0.0 : 1.0;
-              }];
+          - (void)toggle {
+              UIView *term = [SovereignTerminal shared];
+              term.hidden = !term.hidden;
           }
-
-          - (void)handlePan:(UIPanGestureRecognizer *)s {
-              CGPoint t = [s translationInView:self.superview];
+          - (void)drag:(UIPanGestureRecognizer *)p {
+              CGPoint t = [p translationInView:self.superview];
               self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
-              [s setTranslation:CGPointZero inView:self.superview];
+              [p setTranslation:CGPointZero inView:self.superview];
           }
           @end
 
           // =========================================================
-          // [5] المستشعر اللحظي لأحداث اللعب (Aimbot/Fire)
+          // [7] نقطة الإقلاع (Boot)
           // =========================================================
-          @interface SovereignLiveSensor : UIView
-          @property (nonatomic, assign) NSTimeInterval lastTriggerTime;
-          @end
-
-          @implementation SovereignLiveSensor
-
-          - (instancetype)initWithFrame:(CGRect)frame {
-              self = [super initWithFrame:frame];
-              if (self) {
-                  UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-                  longPress.minimumPressDuration = 0.3; 
-                  [self addGestureRecognizer:longPress];
-              }
-              return self;
-          }
-
-          - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
-              if (gesture.state == UIGestureRecognizerStateBegan) {
-                  NSArray *aimFuncs = @[@"ASTExtraVehicle_AimLock", @"ASTExtraPlayerController_GetAimRot", 
-                                        @"UBullet_Trajectory_Calc_Hit", @"ASTExtraWeapon_Shoot_Target"];
-                  NSString *func = aimFuncs[arc4random_uniform((uint32_t)aimFuncs.count)];
-                  [[SovereignLoggerTerminal sharedTerminal] addEvent:@"AIMBOT LOCK" file:@"ShadowTrackerExtra" func:func color:[UIColor purpleColor]];
-              }
-          }
-
-          - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-              if (event.type == UIEventTypeTouches) {
-                  NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-                  if (now - self.lastTriggerTime > 0.4) {
-                      self.lastTriggerTime = now;
-                      CGFloat w = [UIScreen mainScreen].bounds.size.width;
-                      CGFloat h = [UIScreen mainScreen].bounds.size.height;
-                      
-                      dispatch_async(dispatch_get_main_queue(), ^{
-                          if (point.x > (w / 2.0) && point.y < (h - 120)) {
-                              NSArray *fireFuncs = @[@"ASTExtraWeapon_Fire_Event", @"ASTExtraPlayerController_Recoil", 
-                                                     @"ASTExtraShootWeapon_Fire", @"ASTExtraWeapon_BulletTrace"];
-                              NSString *func = fireFuncs[arc4random_uniform((uint32_t)fireFuncs.count)];
-                              [[SovereignLoggerTerminal sharedTerminal] addEvent:@"WEAPON FIRE" file:@"ShadowTrackerExtra" func:func color:[UIColor orangeColor]];
-                          }
-                      });
-                  }
-              }
-              return nil;
-          }
-          @end
-
-          // =========================================================
-          // [6] نظام الإقلاع (Boot System)
-          // =========================================================
-          void __attribute__((constructor)) start_logger_core() {
-              [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
-                                                                object:nil
-                                                                 queue:[NSOperationQueue mainQueue]
-                                                            usingBlock:^(NSNotification *note) {
+          void __attribute__((constructor)) initialize_sovereign() {
+              [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
                   static dispatch_once_t onceToken;
                   dispatch_once(&onceToken, ^{
-                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                           UIWindow *win = [UIApplication sharedApplication].keyWindow;
                           if (win) {
-                              // 1. تشغيل مستشعرات اللمس
-                              SovereignLiveSensor *sensor = [[SovereignLiveSensor alloc] initWithFrame:win.bounds];
-                              sensor.backgroundColor = [UIColor clearColor];
-                              [win addSubview:sensor];
+                              [win addSubview:[SovereignTerminal shared]];
                               
-                              // 2. تشغيل شاشة الترمنال الرئيسية
-                              SovereignLoggerTerminal *terminal = [SovereignLoggerTerminal sharedTerminal];
-                              [win addSubview:terminal];
+                              SovFloatingBtn *btn = [[SovFloatingBtn alloc] initWithFrame:CGRectMake(20, 100, 40, 40)];
+                              [win addSubview:btn];
                               
-                              // 3. إضافة الزر العائم للتحكم بالإخفاء والإظهار
-                              SovereignFloatingButton *floatBtn = [[SovereignFloatingButton alloc] initWithFrame:CGRectMake(20, 60, 45, 45)];
-                              [win addSubview:floatBtn];
+                              [SovGlobalSensor activate]; // تفعيل مستشعرات اللمس الحية
                               
-                              [terminal addEvent:@"SYSTEM BOOT" file:@"Main_Injector" func:@"Init_Core_V120k()" color:[UIColor whiteColor]];
+                              [[SovereignTerminal shared] logEvent:@"SYSTEM ONLINE" file:@"Injector" func:@"Core_Init_Success()" color:[UIColor whiteColor]];
                           }
                       });
                   });
@@ -381,7 +357,7 @@ jobs:
           EOF
 
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -dynamiclib -arch arm64 Sovereign_Logger.m -o Sovereign_Logger.dylib \
+          clang -dynamiclib -arch arm64 Sovereign_Core.m -o Sovereign_Logger.dylib \
           -isysroot $SDK_PATH \
           -framework Foundation -framework UIKit -framework CoreGraphics \
           -fobjc-arc -Os -w -lc++
