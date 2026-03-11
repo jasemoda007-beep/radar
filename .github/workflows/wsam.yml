@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-export-ios-ui:
-    name: Build Sovereign Dylib (Safe UI Monitor)
+    name: Build Sovereign Dylib (Strict iOS Hooks)
     runs-on: macos-latest
 
     steps:
@@ -34,19 +34,18 @@ jobs:
           #import <UIKit/UIKit.h>
           #import <Foundation/Foundation.h>
           #include <mach-o/dyld.h>
+          #include <dlfcn.h>
+          #include <fcntl.h>
+          #include <stdarg.h>
           #include <iostream>
           #include <string>
-          #include <filesystem>
           #include <chrono>
-          #include <thread>
           #include <iomanip>
           #include <sstream>
-          #include <map>
           
           #include "dobby.h"
 
           using namespace std;
-          namespace fs = std::filesystem;
 
           // --- واجهة المستخدم العالمية ---
           UITextView *terminalView;
@@ -59,8 +58,8 @@ jobs:
               dispatch_async(dispatch_get_main_queue(), ^{
                   if (terminalView) {
                       NSString *currentText = terminalView.text;
-                      if (currentText.length > 8000) {
-                          currentText = [currentText substringFromIndex:currentText.length - 3000];
+                      if (currentText.length > 10000) {
+                          currentText = [currentText substringFromIndex:currentText.length - 4000];
                       }
                       terminalView.text = [NSString stringWithFormat:@"%@\n%@", currentText, nsText];
                       NSRange range = NSMakeRange(terminalView.text.length, 0);
@@ -78,61 +77,75 @@ jobs:
           }
 
           // =========================================================================
-          // 🎯 قسم المهندس وسام (تم التعطيل للأمان ومنع الكراش)
+          // 🎯 قسم المهندس وسام (اعتراض دوال نظام iOS الحقيقية 100%)
           // =========================================================================
 
-          uintptr_t getRealOffset(uintptr_t ida_offset) {
-              uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
-              return slide + ida_offset;
-          }
+          // دالة Hook لاعتراض أي ملف تحاول اللعبة فتحه في الرام
+          int (*orig_open)(const char *path, int oflag, ...);
+          int my_open(const char *path, int oflag, ...) {
+              va_list args;
+              va_start(args, oflag);
+              int mode = va_arg(args, int);
+              va_end(args);
 
-          void (*orig_Tick)(void* _this, float DeltaTime);
-          void my_Tick(void* _this, float DeltaTime) {
-              orig_Tick(_this, DeltaTime);
-          }
-
-          void setupDobbyHooks() {
-              logEvent("DOBBY", "ENGINE", "Dobby Framework is loaded but HOOKS ARE DISABLED for safety.");
-              logEvent("INFO", "STATUS", "Find the correct Offset in IDA Pro to enable hacking.");
-              
-              // ⚠️ تم وضع علامة // لإيقاف الكمين ومنع انهيار اللعبة
-              // uintptr_t targetOffset = getRealOffset(0x10CAA0300); 
-              // DobbyHook((void*)targetOffset, (void*)my_Tick, (void**)&orig_Tick);
-          }
-          // =========================================================================
-
-          // محرك المراقبة (يعمل بأمان تام)
-          void runForensicMonitor() {
-              NSString *docPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-              NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
-              
-              vector<string> directories = { string([docPath UTF8String]), string([bundlePath UTF8String]) };
-              
-              logEvent("SYS", "SCANNER", "Searching App Bundle & Sandbox...");
-              map<string, bool> seenFiles;
-
-              while (true) {
-                  for (const auto& dir : directories) {
-                      try {
-                          for (const auto& entry : fs::directory_iterator(dir)) {
-                              if (!entry.is_regular_file()) continue;
-                              string filename = entry.path().filename().string();
-                              
-                              if (seenFiles.find(filename) == seenFiles.end()) {
-                                  seenFiles[filename] = true;
-                                  
-                                  if (filename.find("ShadowTrackerExtra") != string::npos) {
-                                      logEvent("TARGET_FOUND", filename, "Binary located in memory space!");
-                                  } else if (filename.find(".pak") != string::npos || filename.find(".json") != string::npos) {
-                                      logEvent("ASSET_LOADED", filename, "Background file detected.");
-                                  }
-                              }
-                          }
-                      } catch (...) {}
+              if (path != nullptr) {
+                  string filePath(path);
+                  
+                  // صيد ملفات iOS الحساسة فقط لكي لا تنفجر الشاشة
+                  if (filePath.find("ShadowTrackerExtra") != string::npos || 
+                      filePath.find(".pak") != string::npos || 
+                      filePath.find("Enchos") != string::npos ||
+                      filePath.find(".json") != string::npos ||
+                      filePath.find(".dat") != string::npos) {
+                      
+                      string fileName = filePath.substr(filePath.find_last_of("/") + 1);
+                      logEvent("FILE_ACCESS", "SYS_OPEN", "Reading File: " + fileName);
                   }
-                  this_thread::sleep_for(chrono::seconds(5));
               }
+              
+              return orig_open(path, oflag, mode);
           }
+
+          // دالة Hook لاعتراض تحميل المكتبات الديناميكية (iOS dylib & frameworks)
+          void* (*orig_dlopen)(const char* path, int mode);
+          void* my_dlopen(const char* path, int mode) {
+              if (path != nullptr) {
+                  string libPath(path);
+                  
+                  // التركيز على مكتبات آيفون حصراً (.dylib و .framework)
+                  if (libPath.find(".dylib") != string::npos || 
+                      libPath.find(".framework") != string::npos || 
+                      libPath.find("tersafe") != string::npos ||
+                      libPath.find("GCloudCore") != string::npos) {
+                      
+                      string libName = libPath.substr(libPath.find_last_of("/") + 1);
+                      logEvent("DYLIB_LOAD", "SYS_DLOPEN", "iOS Library Loaded: " + libName);
+                  }
+              }
+              return orig_dlopen(path, mode);
+          }
+
+          void setupRealHooks() {
+              logEvent("DOBBY", "ENGINE", "Planting Hooks in iOS C Standard Library...");
+              
+              void* open_ptr = dlsym(RTLD_DEFAULT, "open");
+              if (open_ptr) {
+                  DobbyHook(open_ptr, (void*)my_open, (void**)&orig_open);
+                  logEvent("HOOK_SUCCESS", "SYS_OPEN", "iOS File reads intercepted.");
+              }
+
+              void* dlopen_ptr = dlsym(RTLD_DEFAULT, "dlopen");
+              if (dlopen_ptr) {
+                  DobbyHook(dlopen_ptr, (void*)my_dlopen, (void**)&orig_dlopen);
+                  logEvent("HOOK_SUCCESS", "SYS_DLOPEN", "iOS Dylib loads intercepted.");
+              }
+              
+              uintptr_t slide = _dyld_get_image_vmaddr_slide(0);
+              stringstream ss;
+              ss << "Real ASLR Slide Address: 0x" << hex << uppercase << slide;
+              logEvent("MEM_INFO", "ASLR_BASE", ss.str());
+          }
+          // =========================================================================
 
           // --- بناء الواجهة المرئية (الخدود الطويلة) ---
           @interface SovereignMenu : NSObject
@@ -182,7 +195,7 @@ jobs:
               menuView.hidden = YES;
 
               UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10, 5, width - 80, 25)];
-              title.text = @"[ SOVEREIGN V200K - SAFE MONITOR ACTIVE ]";
+              title.text = @"[ SOVEREIGN V200K - iOS MACH-O HOOKS ]";
               title.textColor = [UIColor redColor];
               title.font = [UIFont fontWithName:@"Courier-Bold" size:12];
               [menuView addSubview:title];
@@ -214,12 +227,11 @@ jobs:
               [mainWindow addSubview:floatingBtn];
               
               PrintToScreen("============================================");
-              PrintToScreen("  SOVEREIGN MONITOR INJECTED (SAFE MODE)");
+              PrintToScreen("  SOVEREIGN iOS ENGINE INJECTED");
               PrintToScreen("  DEVELOPER: ENG. WISSAM (BASRAH CYBER LABS)");
               PrintToScreen("============================================");
               
-              setupDobbyHooks();
-              std::thread(runForensicMonitor).detach();
+              setupRealHooks();
           }
 
           - (void)toggleMenu {
@@ -262,6 +274,6 @@ jobs:
       - name: Upload iOS Dylib Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sovereign-Safe-Monitor-Dylib
+          name: Sovereign-Real-Hooks-Dylib
           path: SovereignEngine.dylib
           retention-days: 5
