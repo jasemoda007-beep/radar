@@ -1,0 +1,226 @@
+
+name: Sovereign-Pro-Engine
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-verify:
+    name: Compiling Sovereign Pro Monitor
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Compile C++ Pro Engine
+        run: |
+          echo "🔥 Building Sovereign Pro FIM Engine..."
+          # استخدام معيار c++17 لضمان عمل مكتبة filesystem
+          clang++ -std=c++17 -O3 sovereign_pro_fim.cpp -o sovereign_monitor
+          echo "✅ Compilation Successful."
+
+      - name: Simulate iOS RDP Environment
+        run: |
+          echo "🚀 Starting Integration Test..."
+          
+          # 1. تشغيل السكربت في الخلفية
+          ./sovereign_monitor &
+          MONITOR_PID=$!
+          
+          sleep 2
+          
+          # 2. محاكاة وضع ملف الشادو من قبل المهندس
+          echo "DUMMY_MACH_O_DATA_1" > ShadowTrackerExtra
+          sleep 2
+          
+          # 3. محاكاة تعديل اللعبة لملف الشادو (التلاعب)
+          echo "DUMMY_MACH_O_DATA_MODIFIED" > ShadowTrackerExtra
+          sleep 2
+          
+          # 4. محاكاة تنزيل ملف خلفية
+          echo "ENCRYPTED_ASSET_DATA" > config_patch.pak
+          sleep 2
+          
+          # إنهاء المحرك وعرض ملف التوثيق
+          kill $MONITOR_PID
+          echo "📄 Audit Log Output:"
+          cat sovereign_audit.log
+
+
+
+
+
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <filesystem>
+#include <chrono>
+#include <thread>
+#include <iomanip>
+#include <map>
+#include <vector>
+#include <sstream>
+
+using namespace std;
+namespace fs = std::filesystem;
+
+/**
+ * ====================================================================================================
+ * SOVEREIGN ELITE X - PRO FILE INTEGRITY MONITOR (FIM)
+ * Architect: Engineer Wissam (Cyber Security Specialist)
+ * Environment: RDP / Non-Jailbreak / iOS Binary Analysis
+ * ====================================================================================================
+ */
+
+// UI Constants (Extended Aesthetic)
+const string GOLD   = "\033[38;5;214m";
+const string CYAN   = "\033[38;5;51m";
+const string GREEN  = "\033[38;5;46m";
+const string RED    = "\033[38;5;196m";
+const string BLUE   = "\033[38;5;39m";
+const string DIM    = "\033[38;5;240m";
+const string RESET  = "\033[0m";
+
+// Structure to hold file snapshot data
+struct FileSnapshot {
+    uintmax_t size;
+    fs::file_time_type last_mod;
+    string checksum;
+};
+
+// 1. نظام توليد البصمة (Custom Fast Checksum) للتحقق من التلاعب الداخلي
+string calculateFileChecksum(const string& filepath) {
+    ifstream file(filepath, ios::binary);
+    if (!file) return "ERROR_READING";
+
+    unsigned long long hash = 14695981039346656037ULL; // FNV-1a offset basis
+    char byte;
+    while (file.get(byte)) {
+        hash ^= (unsigned char)byte;
+        hash *= 1099511628211ULL; // FNV-1a prime
+    }
+    
+    stringstream ss;
+    ss << hex << setfill('0') << setw(16) << hash;
+    return ss.str();
+}
+
+// 2. نظام التوثيق (Audit Logger) لحفظ السجلات
+void writeToAuditLog(const string& logEntry) {
+    ofstream auditFile("sovereign_audit.log", ios::app);
+    if (auditFile.is_open()) {
+        auditFile << logEntry << endl;
+    }
+}
+
+// 3. واجهة التحكم الممتدة (Extended Pro Dashboard)
+void printSovereignDashboard() {
+    cout << GOLD << "============================================================================================================" << endl;
+    cout << GOLD << "|| " << CYAN << "SOVEREIGN FIM ENGINE V20.0" << GOLD << " | " << TEXT << "iOS MACH-O MONITOR" << GOLD << " | " << TEXT << "ENG. WISSAM" << GOLD << " | " << TEXT << "BASRAH CYBER LABS" << GOLD << " ||" << endl;
+    cout << GOLD << "============================================================================================================" << RESET << endl;
+    cout << DIM << " [TIMESTAMP]    [EVENT TYPE]        [FILE TARGET]                       [INTEGRITY DETAILS]" << RESET << endl;
+    cout << GOLD << "------------------------------------------------------------------------------------------------------------" << RESET << endl;
+}
+
+// دالة الطباعة الاحترافية للأحداث
+void logEvent(const string& type, const string& target, const string& details, const string& color) {
+    auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    stringstream timestamp;
+    timestamp << put_time(localtime(&now), "%H:%M:%S");
+
+    // تنسيق مسافات الأعمدة (Table Alignment)
+    cout << DIM << " [" << timestamp.str() << "] " << RESET
+         << color << left << setw(19) << ("[" + type + "]") << RESET
+         << left << setw(35) << target 
+         << color << details << RESET << endl;
+
+    // حفظ في السجل
+    string rawLog = "[" + timestamp.str() + "] [" + type + "] Target: " + target + " | Details: " + details;
+    writeToAuditLog(rawLog);
+}
+
+// التحقق من نوع الملف
+bool isMachO(const string& path) {
+    ifstream file(path, ios::binary);
+    if (!file) return false;
+    unsigned char buf[4];
+    file.read((char*)buf, 4);
+    return (buf[0] == 0xCF && buf[1] == 0xFA && buf[2] == 0xED && buf[3] == 0xFE);
+}
+
+// 4. محرك المراقبة الجنائية (Forensic Monitor Engine)
+void runForensicMonitor(const string& directory) {
+    map<string, FileSnapshot> snapshotDB;
+    string mainTarget = "ShadowTrackerExtra";
+
+    logEvent("SYSTEM_BOOT", "ENGINE", "Initializing Deep Monitor in Directory: " + directory, CYAN);
+    logEvent("STATUS", "WAITING", "Awaiting ShadowTrackerExtra extraction...", DIM);
+
+    while (true) {
+        try {
+            for (const auto& entry : fs::directory_iterator(directory)) {
+                if (!entry.is_regular_file()) continue;
+
+                string filename = entry.path().filename().string();
+                if (filename == "sovereign_audit.log" || filename == "sovereign_monitor") continue; // تجاهل ملفات النظام
+
+                uintmax_t current_size = fs::file_size(entry);
+                auto current_time = fs::last_write_time(entry);
+
+                // أ. اكتشاف ملف جديد
+                if (snapshotDB.find(filename) == snapshotDB.end()) {
+                    string checksum = calculateFileChecksum(entry.path().string());
+                    snapshotDB[filename] = {current_size, current_time, checksum};
+                    
+                    if (filename.find(mainTarget) != string::npos) {
+                        logEvent("TARGET_LOCKED", filename, "New File Detected. Size: " + to_string(current_size) + "B", GREEN);
+                        if(isMachO(entry.path().string())) {
+                            logEvent("BINARY_VERIFIED", filename, "Valid iOS Mach-O Signature Confirmed.", CYAN);
+                        }
+                        logEvent("HASH_GENERATED", filename, "Checksum: " + checksum, GOLD);
+                    } else {
+                        logEvent("BACKGROUND_FILE", filename, "Detected Download. Checksum: " + checksum, BLUE);
+                    }
+                } 
+                // ب. اكتشاف تعديل (الحجم أو الوقت تغير) -> نقوم بفحص البصمة
+                else if (snapshotDB[filename].last_mod != current_time || snapshotDB[filename].size != current_size) {
+                    string new_checksum = calculateFileChecksum(entry.path().string());
+                    
+                    if (filename.find(mainTarget) != string::npos) {
+                        logEvent("TAMPER_DETECTED", filename, "File Modified! Analyzing internal changes...", RED);
+                        logEvent("HASH_CHANGED", filename, "Old: " + snapshotDB[filename].checksum + " -> New: " + new_checksum, RED);
+                    } else {
+                        logEvent("FILE_UPDATED", filename, "Background file updated by game.", YELLOW);
+                    }
+                    
+                    // تحديث قاعدة البيانات
+                    snapshotDB[filename] = {current_size, current_time, new_checksum};
+                }
+            }
+        } catch (...) {
+            // صمت الأخطاء لكي لا ينهار السكربت إذا كان الملف مقفولاً من قبل اللعبة
+        }
+
+        // نوم الخيط البرمجي لتقليل استهلاك المعالج (CPU Optimization)
+        this_thread::sleep_for(chrono::milliseconds(1500)); 
+    }
+}
+
+int main() {
+    printSovereignDashboard();
+    
+    // مسح المجلد الحالي 
+    string workspace = "."; 
+    
+    // تسجيل بدء الجلسة في ملف السجل
+    writeToAuditLog("==================================================");
+    writeToAuditLog("NEW SESSION STARTED: ENG. WISSAM SOVEREIGN ENGINE");
+    writeToAuditLog("==================================================");
+
+    runForensicMonitor(workspace);
+
+    return 0;
+}
