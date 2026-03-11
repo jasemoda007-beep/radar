@@ -6,17 +6,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-run:
-    name: Wissam Cyber Security Suite
+  build-and-export:
+    name: Build Sovereign Dylib
     runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Generate Sovereign C++ Engine
+      - name: Generate Sovereign C++ Dylib Source
         run: |
-          cat << 'EOF_CPP' > sovereign_pro_fim.cpp
+          cat << 'EOF_CPP' > sovereign_dylib.cpp
           #include <iostream>
           #include <fstream>
           #include <string>
@@ -62,6 +62,7 @@ jobs:
           }
 
           void writeToAuditLog(const string& logEntry) {
+              // مسار الحفظ (يمكنك تغييره لاحقاً لمسار محدد في الـ RDP الخاص بك)
               ofstream auditFile("sovereign_audit.log", ios::app);
               if (auditFile.is_open()) {
                   auditFile << logEntry << endl;
@@ -71,7 +72,7 @@ jobs:
           // تصميم ممتد (الخدود الطويلة)
           void printSovereignDashboard() {
               cout << GOLD << "============================================================================================================" << endl;
-              cout << GOLD << "|| " << CYAN << "SOVEREIGN FIM ENGINE V20.0" << GOLD << " | \033[97m" << "iOS MACH-O MONITOR" << GOLD << " | \033[97m" << "ENG. WISSAM" << GOLD << " | \033[97m" << "BASRAH CYBER LABS" << GOLD << " ||" << endl;
+              cout << GOLD << "|| " << CYAN << "SOVEREIGN FIM ENGINE V20.0" << GOLD << " | \033[97m" << "iOS DYLIB INJECTED" << GOLD << " | \033[97m" << "ENG. WISSAM" << GOLD << " | \033[97m" << "BASRAH CYBER LABS" << GOLD << " ||" << endl;
               cout << GOLD << "============================================================================================================" << RESET << endl;
               cout << DIM << " [TIMESTAMP]    [EVENT TYPE]        [FILE TARGET]                       [INTEGRITY DETAILS]" << RESET << endl;
               cout << GOLD << "------------------------------------------------------------------------------------------------------------" << RESET << endl;
@@ -91,21 +92,21 @@ jobs:
               writeToAuditLog(rawLog);
           }
 
-          void runForensicMonitor(const string& directory) {
+          // المحرك الرئيسي
+          void runForensicMonitor() {
+              string directory = "."; // راقب المسار الحالي الذي تم حقن الدايلب فيه
               map<string, FileSnapshot> snapshotDB;
               string mainTarget = "ShadowTrackerExtra";
 
-              logEvent("SYSTEM_BOOT", "ENGINE", "Initializing Monitor in Sandbox...", CYAN);
+              logEvent("DYLIB_LOADED", "ENGINE", "Sovereign Module injected successfully.", CYAN);
 
-              int cycles = 0;
-              // نجعل المراقبة تعمل لـ 8 ثواني فقط لتناسب بيئة GitHub Actions ثم تتوقف بنجاح
-              while (cycles < 8) {
+              while (true) {
                   try {
                       for (const auto& entry : fs::directory_iterator(directory)) {
                           if (!entry.is_regular_file()) continue;
 
                           string filename = entry.path().filename().string();
-                          if (filename == "sovereign_audit.log" || filename == "sovereign_monitor" || filename == "sovereign_pro_fim.cpp") continue;
+                          if (filename == "sovereign_audit.log" || filename == "sovereign_dylib.cpp") continue;
 
                           uintmax_t current_size = fs::file_size(entry);
                           auto current_time = fs::last_write_time(entry);
@@ -130,48 +131,33 @@ jobs:
                       }
                   } catch (...) {}
 
-                  this_thread::sleep_for(chrono::seconds(1));
-                  cycles++;
+                  this_thread::sleep_for(chrono::seconds(2));
               }
-              logEvent("SYS_EXIT", "ENGINE", "Monitoring cycle finished successfully.", GOLD);
           }
 
-          int main() {
+          // نقطة الإقلاع الخاصة بالـ Dylib (تعمل تلقائياً عند الحقن)
+          __attribute__((constructor))
+          void onSovereignInject() {
               printSovereignDashboard();
               writeToAuditLog("==================================================");
-              writeToAuditLog("NEW SESSION STARTED: ENG. WISSAM SOVEREIGN ENGINE");
+              writeToAuditLog("DYLIB INJECTED: ENG. WISSAM SOVEREIGN ENGINE");
               writeToAuditLog("==================================================");
               
-              runForensicMonitor(".");
-              return 0;
+              // تشغيل المحرك في Thread منفصل لكي لا يسبب كراش للعبة
+              std::thread(runForensicMonitor).detach();
           }
           EOF_CPP
 
-      - name: Compile Sovereign C++ Engine
+      - name: Compile as Dynamic Library (.dylib)
         run: |
-          echo "🔥 Building Sovereign Pro Monitor..."
-          clang++ -std=c++17 -O3 sovereign_pro_fim.cpp -o sovereign_monitor
-          echo "✅ Compilation Successful."
+          echo "🔥 Building Sovereign Pro Dylib..."
+          # استخدام علم -dynamiclib لتحويل الكود إلى مكتبة دايلب لآبل
+          clang++ -std=c++17 -O3 -dynamiclib sovereign_dylib.cpp -o SovereignEngine.dylib
+          echo "✅ Dylib Compilation Successful."
 
-      - name: Run Background Tests
-        run: |
-          echo "🚀 Simulating live game events..."
-          
-          # تشغيل المحرك في الخلفية
-          ./sovereign_monitor &
-          MONITOR_PID=$!
-          
-          # محاكاة الأحداث أثناء عمل المحرك
-          sleep 2
-          echo "Mock Shadow Binary" > ShadowTrackerExtra
-          sleep 2
-          echo "Mock Downloaded Asset" > Enchos_Data.pak
-          sleep 2
-          echo "Tampering with Shadow Binary" >> ShadowTrackerExtra
-          
-          # انتظار المحرك ليُنهي دورته
-          wait $MONITOR_PID
-          
-          echo ""
-          echo "📄 Sovereign Audit Log Saved:"
-          cat sovereign_audit.log
+      - name: Upload Dylib Artifact for Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: SovereignEngine-Dylib
+          path: SovereignEngine.dylib
+          retention-days: 5
