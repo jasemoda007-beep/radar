@@ -1,9 +1,13 @@
 name: 🐲 DRAGON HACK - ESIGN SAFE BUILDER (iOS)
- 
+
 on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch: 
+
+# 🛠️ حل تحذير GitHub (ترقية خوادم Node.js لعام 2026)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build_dragon:
@@ -405,15 +409,12 @@ jobs:
           EOF
 
       # ========================================================
-      # 2. تجهيز بيئة البناء
+      # 2. تجهيز بيئة البناء وسحب المكاتب
       # ========================================================
       - name: 🛠️ تجهيز Xcode SDK
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      # ========================================================
-      # 3. تحميل المكاتب (ImGui, Dobby, Json)
-      # ========================================================
-      - name: 🌐 تحميل المكاتب والمحركات
+      - name: 🌐 تحميل المكاتب (ImGui, Dobby, Json, Metal)
         run: |
           git clone --depth 1 https://github.com/ocornut/imgui.git imgui_src
           mkdir -p imgui
@@ -430,5 +431,31 @@ jobs:
           cp dobby_src/include/dobby.h dobby/include/ && cp dobby_src/build/libdobby.a dobby/lib/
 
       # ========================================================
-      # 4. عملية الصهر وإنشاء الـ Dylib الحقيقي
-      # =========================================
+      # 3. عملية الصهر وإنشاء الـ Dylib الحقيقي
+      # ========================================================
+      - name: 🔥 عملية الصهر
+        run: |
+          mkdir -p out
+          xcrun --sdk iphoneos clang++ -x objective-c++ -arch arm64 -dynamiclib -std=c++17 -O3 -fobjc-arc \
+          -I./imgui -I./dobby/include -I. wsam.mm \
+          imgui/*.cpp imgui/imgui_impl_metal.mm -L./dobby/lib -ldobby \
+          -framework Foundation -framework UIKit -framework Metal -framework MetalKit -framework QuartzCore \
+          -o out/WMASTER_Dragon.dylib
+
+      # ========================================================
+      # 4. إجبار السيرفر على ضغط الـ Dylib (لحل مشكلة زر التحميل)
+      # ========================================================
+      - name: 📦 ضغط الملف للتحميل
+        run: |
+          cd out
+          zip DRAGON-HACK.zip WMASTER_Dragon.dylib
+
+      # ========================================================
+      # 5. رفع الملف لاستخراجه
+      # ========================================================
+      - name: 📤 استخراج الهاك النهائي
+        uses: actions/upload-artifact@v4
+        with:
+          name: DRAGON-HACK-SHAMMARI
+          path: out/DRAGON-HACK.zip
+          if-no-files-found: error
