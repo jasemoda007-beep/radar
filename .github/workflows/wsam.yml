@@ -173,10 +173,12 @@ jobs:
                   .login-card { background: var(--panel); padding: 35px; border-radius: 20px; border: 1px solid #30363d; width: 320px; text-align: center; border-top: 4px solid var(--cyan); box-shadow: 0 30px 100px #000; }
                   .logo-text { font-size: 26px; font-weight: 900; color: var(--cyan); letter-spacing: 2px; margin-bottom: 25px; text-shadow: 0 0 15px rgba(0,229,255,0.4); }
                   
-                  .key-in { width: 100%; padding: 16px; background: #000; border: 1px solid #333; border-radius: 10px; color: var(--cyan); font-family: monospace; font-size: 18px; text-align: center; box-sizing: border-box; margin-bottom: 20px; text-transform: uppercase; outline: none; }
-                  .key-in:focus { border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
-                  .btn-act { width: 100%; padding: 16px; background: var(--cyan); color: #000; border: none; border-radius: 10px; font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.3s; }
+                  .key-in { width: 100%; padding: 16px; background: #000; border: 1px solid #333; color: var(--cyan); text-align: center; border-radius: 10px; margin-bottom: 20px; font-family: monospace; font-size: 18px; outline: none; transition: 0.3s; box-sizing: border-box; text-transform: uppercase; }
+                  .key-in:focus { border-color: var(--cyan); box-shadow: 0 0 15px rgba(0,229,255,0.2); }
+                  .btn-act { width: 100%; padding: 16px; background: var(--cyan); color: #000; border: none; border-radius: 10px; font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
                   .btn-act:active { transform: scale(0.95); }
+                  .loader { width: 20px; height: 20px; border: 3px solid rgba(0,0,0,0.1); border-top: 3px solid #000; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+                  @keyframes spin { 100% { transform: rotate(360deg); } }
 
                   /* ================= 4. المنيو الرئيسي (ثابت لا يتحرك) ================= */
                   /* [شرح]: تم تثبيت المنيو في منتصف يسار الشاشة لسهولة الوصول */
@@ -185,7 +187,7 @@ jobs:
                   .m-content { padding: 18px; max-height: 70vh; overflow-y: auto; }
 
                   /* بطاقة VIP واللمبات المدمجة */
-                  .vip-card { border: 1px solid rgba(0,229,255,0.3); background: rgba(0,229,255,0.03); padding: 15px; border-radius: 10px; margin-bottom: 20px; border-right: 4px solid var(--cyan); }
+                  .vip-card { border: 1px solid rgba(0,229,255,0.3); background: rgba(0,229,255,0.03); padding: 15px; border-radius: 10px; margin-bottom: 20px; border-right: 4px solid var(--cyan); position: relative; }
                   
                   .led-panel { display: flex; gap: 15px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); }
                   .led-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
@@ -198,7 +200,7 @@ jobs:
                   /* المنسدلات والسويتشات */
                   .drop-btn { width: 100%; padding: 14px; background: #1c2128; border: 1px solid #30363d; color: #fff; text-align: right; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: bold; transition: 0.2s; }
                   .drop-btn:active { background: #24292e; border-color: var(--cyan); }
-                  .drop-content { display: none; padding: 10px; border-right: 2px solid var(--cyan); background: rgba(255,255,255,0.01); margin-bottom: 12px; }
+                  .drop-content { display: none; padding: 10px; border-right: 2px solid var(--cyan); background: rgba(255,255,255,0.01); margin-bottom: 12px; border-radius: 0 0 8px 8px; }
 
                   .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); align-items: center; font-size: 13px; }
                   
@@ -227,8 +229,12 @@ jobs:
               <div id="login-screen" class="interactive">
                   <div class="login-card">
                       <div class="logo-text">DRAGON HACK</div>
+                      <p style="color:#8b949e; font-size:12px; margin-bottom:25px;">برمجة المهندس محمد الشمري</p>
                       <input type="text" id="keyInp" class="key-input" placeholder="أدخل كود الاشتراك هنا">
-                      <button class="btn-act" id="actBtn" onclick="processLogin()">تسجيل الدخول للسيرفر</button>
+                      <button class="btn-act" id="actBtn" onclick="processLogin()">
+                          <span id="btnText">تسجيل الدخول للسيرفر</span>
+                          <div class="loader" id="loader"></div>
+                      </button>
                       <p id="msgErr" style="font-size:12px; color:var(--red); margin-top:15px; display:none;">فشل الاتصال بالسيرفر!</p>
                   </div>
               </div>
@@ -255,12 +261,12 @@ jobs:
                       
                       <!-- بطاقة الاشتراك واللمبات المدمجة -->
                       <div class="vip-card">
-                          <div style="color:var(--cyan); font-weight:bold; font-size:14px;">المشترك: محمد الشمري (VIP)</div>
+                          <div style="color:var(--cyan); font-weight:bold; font-size:14px; margin-bottom:5px;">المشترك: محمد الشمري (VIP)</div>
                           <div style="font-size:12px; color:#8b949e; margin-top:5px;">الانتهاء: <span style="color:#fff;" id="expDate">--/--/----</span></div>
                           
                           <div class="led-panel">
-                              <div class="led-item" style="color:var(--green)"><div class="dot dot-live"></div> السيرفر: Live</div>
-                              <div class="led-item" id="protLed" style="color:var(--green)"><div class="dot dot-safe" id="safeDot"></div> الحماية: آمن</div>
+                              <div class="led-item"><div class="dot dot-live"></div> السيرفر: Live</div>
+                              <div class="led-item" id="protLed"><div class="dot dot-safe" id="safeDot"></div> الحماية: آمن</div>
                           </div>
                       </div>
 
@@ -302,18 +308,27 @@ jobs:
               <script>
                   // [شرح]: دالة اللوكن، تأخذ الكود المدخل وترسله للـ C++ ولا تحفظه!
                   function processLogin() {
-                      const btn = document.getElementById('actBtn');
+                      const btnText = document.getElementById('btnText');
+                      const loader = document.getElementById('loader');
                       const key = document.getElementById('keyInp').value;
+                      
                       if(key.length < 3) { alert("يرجى إدخال الكود!"); return; }
                       
-                      btn.innerText = 'جاري التحقق...';
+                      btnText.style.display = 'none';
+                      loader.style.display = 'block';
+                      
+                      // إرسال الكود لطبقة الـ C++
                       window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action:"login", key:key}));
                   }
 
                   // [شرح]: استقبال الرد من السيرفر
                   function onLoginResponse(resStr) {
                       let res = JSON.parse(resStr);
+                      const btnText = document.getElementById('btnText');
+                      const loader = document.getElementById('loader');
+                      
                       if (res.status === 'success') {
+                          // إخفاء شاشة اللوكن وإظهار المنيو
                           document.getElementById('login-screen').style.display = 'none';
                           document.getElementById('main-menu').style.display = 'flex';
                           document.getElementById('expDate').innerText = res.expire;
@@ -330,13 +345,16 @@ jobs:
                               pLed.innerHTML = sDot.outerHTML + ' الحماية: خطر 🔴';
                           }
                       } else if (res.status === 'freeze') {
+                          // تفعيل وضع الشاشة السوداء الكاملة
                           document.getElementById('login-screen').style.display = 'none';
+                          document.getElementById('main-menu').style.display = 'none';
                           document.getElementById('freeze-screen').style.display = 'flex';
                           document.getElementById('freezeMsg').innerText = res.msg;
                       } else {
-                          document.getElementById('actBtn').innerText = 'تسجيل الدخول للسيرفر';
+                          btnText.style.display = 'block';
+                          loader.style.display = 'none';
                           document.getElementById('msgErr').style.display = 'block';
-                          document.getElementById('msgErr').innerText = res.msg;
+                          document.getElementById('msgErr').innerText = res.msg || 'الكود غير صحيح!';
                       }
                   }
 
@@ -456,7 +474,17 @@ jobs:
           }
           EOF
 
-      - name: 🛠️ تجهيز بيئة البناء
+      # ========================================================
+      # 2. تحميل المكتبات المطلوبة
+      # ========================================================
+      - name: 🌐 تحميل مكتبة json.hpp
+        run: |
+          curl -sSL -o json.hpp https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp
+
+      # ========================================================
+      # 3. بناء الأداة (تحميل المكتبات والصهر)
+      # ========================================================
+      - name: 🛠️ تجهيز Xcode SDK
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: 🔥 عملية البناء والصهر
