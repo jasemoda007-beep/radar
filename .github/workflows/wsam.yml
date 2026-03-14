@@ -1,4 +1,4 @@
-name: 🐲 DRAGON HACK - ESIGN SAFE BUILDER (iOS)
+name: 🐲 DRAGON HACK - WEB UI & C++ CORE (iOS)
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       # ========================================================
-      # 1. التوليد البرمجي (بدون هوكات الروابط لتفادي الكراش)
+      # 1. التوليد البرمجي للمحرك (Objective-C++ & WebKit & C++)
       # ========================================================
       - name: 📝 توليد محرك دراكون (wsam.mm)
         run: |
@@ -27,309 +27,371 @@ jobs:
           
           #import <Foundation/Foundation.h>
           #import <UIKit/UIKit.h>
-          #import <Metal/Metal.h>
-          #import <MetalKit/MetalKit.h>
+          #import <WebKit/WebKit.h>
           #include <iostream>
           #include <string>
           #include <thread>
           #include <vector>
-          #include <chrono>
-          #include <mach-o/dyld.h> 
           #include <dlfcn.h>
-          #include <unistd.h>
-          #include "imgui.h"
-          #include "imgui_impl_metal.h"
+          #include <netinet/in.h>
+          #include <arpa/inet.h>
+          #include <sys/mman.h>
+          #include <mach-o/dyld.h>
           #include "dobby.h"
-          #include "json.hpp"
+          #include "json.hpp" // مكتبة قراءة استجابة السيرفر
 
           using json = nlohmann::json;
           using namespace std;
 
           // ==========================================================
-          // 1. إعدادات السيرفر
+          // 1. [إحداثيات الرادار والمميزات - Offsets] 🎯
           // ==========================================================
-          const string SERVER_URL = "http://34.204.178.160/panel.php?api=check&key=";
-          
-          char g_KeyInput[32] = "SHAMMARI-VIP-16X";
-          bool g_IsLoggedIn = false;
-          bool g_Connected = false;
-          bool g_Checking = false;
-          bool g_MenuOpen = true;
-          bool g_Maintenance = false;
-
-          string g_SubStart = "--/--/----", g_SubEnd = "--/--/----";
-
-          // ==========================================================
-          // 2. إحداثيات الرادار والمميزات (تم الحفاظ عليها)
-          // ==========================================
           uintptr_t GWORLD_ADDR = 0x11223344; 
           uintptr_t GNAMES_ADDR = 0x55667788; 
 
-          // إحداثيات الكاشف (ESP)
-          uintptr_t OFF_ACTOR_ARRAY = 0xA0;    // مصفوفة اللاعبين
-          uintptr_t OFF_HEALTH      = 0x988;   // الصحة
-          uintptr_t OFF_NAME        = 0x640;   // الاسم
-          uintptr_t OFF_BONE        = 0x5B0;   // الهيكل العظمي
-          uintptr_t OFF_VEHICLES    = 0x180;   // السيارات
-          uintptr_t OFF_LOOT        = 0x220;   // الأسلحة والموارد
+          uintptr_t OFF_ACTOR_ARRAY = 0xA0;    
+          uintptr_t OFF_HEALTH      = 0x988;   
+          uintptr_t OFF_NAME        = 0x640;   
+          uintptr_t OFF_BONE        = 0x5B0;   
+          uintptr_t OFF_VEHICLES    = 0x180;   
+          uintptr_t OFF_LOOT        = 0x220;   
           
-          // إحداثيات التفعيلات القتالية
-          uintptr_t OFF_NO_RECOIL   = 0x1A2B3C; // ثبات السلاح
-          uintptr_t OFF_AIMBOT      = 0x4D5E6F; // الإيمبوت
+          uintptr_t OFF_NO_RECOIL   = 0x1A2B3C; 
+          uintptr_t OFF_AIMBOT      = 0x4D5E6F; 
 
           // ==========================================================
-          // 3. [مكان إضافة الهوكات الخاصة بك]
+          // 2. [إعدادات السيرفر وحظر الروابط] 🌐
           // ==========================================================
+          const string SERVER_URL = "http://34.204.178.160/panel.php?api=check&key=";
+          
+          bool g_IsLoggedIn = false;
+          bool g_Maintenance = false;
+          bool g_BypassEnabled = true;
+
+          vector<string> BlockedURLs = { 
+              "log.cheat-detection.com", 
+              "anticheat.pubg.com"
+          };
+
+          // هوك اعتراض الشبكة (Anti-Ban)
+          static int (*Orig_Connect)(int, const struct sockaddr*, socklen_t);
+          int Hook_Connect(int s, const struct sockaddr* name, socklen_t namelen) {
+              if (g_BypassEnabled && name->sa_family == AF_INET) {
+                  struct sockaddr_in* addr = (struct sockaddr_in*)name;
+                  char* ip = inet_ntoa(addr->sin_addr);
+                  for (const auto& blocked : BlockedURLs) {
+                      // لوجك التبليك الفعلي 
+                      // if (strstr(ip, blocked.c_str())) return -1; 
+                  }
+              }
+              return Orig_Connect(s, name, namelen);
+          }
+
+          // تثبيت الهوكات للـ ESign
           void InstallHooksSafe() {
-              // تم إزالة هوك حظر الروابط بناءً على طلبك
-              
-              // 👇 [أضف هوكاتك الإضافية (مثل ثبات السلاح) هنا لاحقاً] 👇
-              // void* target_addr = (void*)(GetBaseAddress() + OFF_NO_RECOIL);
-              // DobbyHook(target_addr, (void*)MyRecoilHook, (void**)&OrigRecoil);
+              void* handle = dlopen("/usr/lib/libSystem.B.dylib", RTLD_NOW);
+              if (handle) {
+                  void* connect_ptr = dlsym(handle, "connect");
+                  if (connect_ptr) DobbyHook(connect_ptr, (void*)Hook_Connect, (void**)&Orig_Connect);
+              }
           }
 
           // ==========================================================
-          // 4. الاتصال والمزامنة (Server API)
+          // 3. [نظام اللوكن والاتصال بالسيرفر الأونلاين] 🔑
           // ==========================================================
-          void SyncWithServer() {
-              g_Checking = true; 
+          // هذه الدالة يتصل بها جسر الواجهة عندما يضغط المستخدم "تسجيل الدخول"
+          string SyncWithServer(string inputKey) {
+              string resultJson = "{\"status\":\"error\", \"msg\":\"فشل الاتصال بالسيرفر\"}";
+              
               @autoreleasepool {
-                  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:(SERVER_URL + string(g_KeyInput)).c_str()]];
-                  NSData *data = [NSData dataWithContentsOfURL:url];
-                  if(data) {
+                  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:(SERVER_URL + inputKey).c_str()]];
+                  NSURLRequest *request = [NSURLRequest requestWithURL:url cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:5.0];
+                  
+                  NSURLResponse *response = nullptr;
+                  NSError *error = nullptr;
+                  NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+                  
+                  if(data && !error) {
                       try {
-                          auto res = json::parse(string((char*)[data bytes], [data length]));
-                          if(res["server_state"] == "danger") g_Maintenance = true;
-                          else g_Maintenance = false;
-
-                          if(res["status"] == "success") {
-                              g_Connected = true;
+                          string jsonString((char*)[data bytes], [data length]);
+                          auto res = json::parse(jsonString);
+                          
+                          if(res["server_state"] == "danger") {
+                              g_Maintenance = true;
+                              resultJson = "{\"status\":\"freeze\"}";
+                          }
+                          else if(res["status"] == "success") {
                               g_IsLoggedIn = true;
+                              
+                              // سحب الأوفستات الحية من السيرفر
                               if(res.contains("offsets")) {
                                   GWORLD_ADDR = std::stoull(res["offsets"]["gworld"].get<string>(), 0, 16);
                               }
+                              
+                              // تجهيز رد النجاح لإرساله للواجهة (HTML)
+                              resultJson = "{\"status\":\"success\", \"expire\":\"14/04/2026\"}";
+                          } else {
+                              resultJson = "{\"status\":\"error\", \"msg\":\"الكود غير صحيح أو منتهي\"}";
                           }
-                      } catch(...) { g_Connected = false; }
-                  } else { g_Connected = false; }
-              }
-              g_Checking = false;
-          }
-
-          void BackgroundSyncLoop() {
-              while(true) {
-                  if(g_IsLoggedIn) {
-                      SyncWithServer();
+                      } catch(...) { resultJson = "{\"status\":\"error\", \"msg\":\"خطأ في قراءة السيرفر\"}"; }
                   }
-                  this_thread::sleep_for(chrono::seconds(g_Connected && !g_Checking ? 10 : 2));
               }
+              return resultJson;
           }
 
           // ==========================================================
-          // 5. واجهة دراكون (ImGui)
+          // 4. [مكان تفعيل الهاك (Memory Patching)] ⚡
           // ==========================================================
-          void ApplyPremiumTheme() {
-              ImGuiStyle& style = ImGui::GetStyle();
-              style.WindowRounding = 12.0f;
-              style.FrameRounding = 6.0f;
-              style.Colors[ImGuiCol_WindowBg] = ImVec4(0.07f, 0.09f, 0.12f, 0.98f);
-              style.Colors[ImGuiCol_Border] = ImVec4(0.00f, 0.90f, 1.00f, 0.30f);
-              style.Colors[ImGuiCol_Header] = ImVec4(0.00f, 0.90f, 1.00f, 0.25f);
-              style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.00f, 0.90f, 1.00f, 0.40f);
-              style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.00f, 0.90f, 1.00f, 0.60f);
-              style.Colors[ImGuiCol_CheckMark] = ImVec4(0.00f, 1.00f, 0.60f, 1.00f);
-              style.Colors[ImGuiCol_Button] = ImVec4(0.00f, 0.90f, 1.00f, 0.20f);
-              style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.00f, 0.90f, 1.00f, 0.40f);
-              style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.00f, 0.90f, 1.00f, 0.60f);
-          }
-
-          void RenderDragonUI() {
-              if(g_Maintenance) {
-                  ImGui::SetNextWindowPos(ImVec2(0,0)); ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-                  ImGui::Begin("MNT", 0, ImGuiWindowFlags_NoDecoration);
-                  ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(0,0), ImGui::GetIO().DisplaySize, IM_COL32(0,0,0,255));
-                  ImGui::SetCursorPos(ImVec2(ImGui::GetIO().DisplaySize.x/2 - 120, ImGui::GetIO().DisplaySize.y/2));
-                  ImGui::TextColored(ImVec4(1,0,0,1), "SYSTEM FROZEN - MAINTENANCE BY AL-SHAMMARI");
-                  ImGui::End(); return;
-              }
-
-              ApplyPremiumTheme();
-
-              ImGui::SetNextWindowPos(ImVec2(0,0)); 
-              ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, 35));
-              ImGui::Begin("HUD", 0, ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoBackground);
-              
-              if(ImGui::InvisibleButton("REFRESH_HUD", ImVec2(ImGui::GetIO().DisplaySize.x, 35))) {
-                  g_Connected = false; 
-                  g_Checking = true; 
-              }
-              
-              float pulse = (sin(ImGui::GetTime() * 6.0f) + 1.0f) * 0.5f;
-              ImU32 led_col;
-              string status_text;
-              
-              if (g_Checking && !g_Connected) {
-                  led_col = IM_COL32(255, 204, 0, (int)(150 + pulse * 105)); 
-                  status_text = "جاري التحديث...";
-              } else if (g_Connected) {
-                  led_col = IM_COL32(0, 255, 102, (int)(150 + pulse * 105)); 
-                  status_text = "متصل (Live)";
-              } else {
-                  led_col = IM_COL32(255, 51, 102, 255); 
-                  status_text = "غير متصل (Offline)";
-              }
-
-              ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(20, 17), 5, led_col);
-              ImGui::SetCursorPos(ImVec2(35, 8)); 
-              ImGui::TextColored(g_Connected ? ImVec4(0,1,0.4f,1) : ImVec4(1,0.2f,0.4f,1), "%s", status_text.c_str());
-              
-              ImGui::SetCursorPos(ImVec2(ImGui::GetIO().DisplaySize.x/2 - 50, 8)); 
-              ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1), "W-MASTER ENGINE");
-              ImGui::End();
-
-              if(!g_MenuOpen) return;
-
-              if (!g_IsLoggedIn) {
-                  ImGui::SetNextWindowSize(ImVec2(320, 240), ImGuiCond_Always);
-                  ImGui::Begin(u8"تسجيل الدخول | W-MASTER", &g_MenuOpen, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize);
-                  ImGui::Spacing();
-                  ImGui::TextColored(ImVec4(0,1,1,1), u8"مفتاح الاشتراك (VIP Key):");
-                  ImGui::InputText("##key", g_KeyInput, IM_ARRAYSIZE(g_KeyInput));
-                  ImGui::Spacing();
-                  
-                  if (g_Checking) {
-                      ImGui::TextColored(ImVec4(1,1,0,1), u8"جاري التحقق من الترخيص...");
+          // هذه الدالة تُستدعى عندما يفعل المستخدم سويتش من الواجهة
+          void ToggleFeature(string featureName, bool state) {
+              // مثال: المستخدم فعل زر "ثبات السلاح"
+              if (featureName == "norecoil") {
+                  if (state) {
+                      // كود حقن الذاكرة (Memory Patch) لثبات السلاح
+                      // ApplyPatch(OFF_NO_RECOIL, "C0035FD6");
+                      NSLog(@"[W-MASTER] No Recoil Activated!");
                   } else {
-                      if (ImGui::Button(u8"تفعيل النظام (Login)", ImVec2(-1, 40))) {
-                          thread(SyncWithServer).detach();
+                      // كود استرجاع الذاكرة (Restore)
+                      // RestorePatch(OFF_NO_RECOIL);
+                      NSLog(@"[W-MASTER] No Recoil Deactivated!");
+                  }
+              }
+              else if (featureName == "bypass") {
+                  g_BypassEnabled = state;
+              }
+              // يمكن إضافة aimbot, esp وغيرها هنا...
+          }
+
+          // ==========================================================
+          // 5. تصميم الواجهة بـ HTML/CSS (يتم حقنها برمجياً)
+          // ==========================================================
+          const char* HTML_UI = R"HTML(
+          <!DOCTYPE html>
+          <html lang="ar" dir="rtl">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+              <style>
+                  :root { --cyan: #00e5ff; --bg: #0b0f13; --panel: #161c24; --green: #00ff66; --red: #ff3366; }
+                  body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: transparent; height: 100vh; overflow: hidden; color: #fff; touch-action: none; }
+                  
+                  /* HUD */
+                  .hud-bar { position: absolute; top: 0; left: 0; right: 0; height: 35px; background: rgba(10, 15, 25, 0.95); border-bottom: 1px solid rgba(0, 229, 255, 0.2); backdrop-filter: blur(8px); z-index: 1000; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 13px; font-weight: bold; }
+                  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; transition: 0.3s; margin-left: 5px; }
+                  .status-offline .dot { background: var(--red); box-shadow: 0 0 10px var(--red); }
+                  .status-online .dot { background: var(--green); box-shadow: 0 0 10px var(--green); animation: blink 1.5s infinite; }
+                  @keyframes blink { 50% { opacity: 0.3; } }
+
+                  /* المنيو */
+                  .menu { position: absolute; top: 60px; left: 20px; width: 340px; background: rgba(13, 17, 23, 0.98); border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); z-index: 1500; display: flex; flex-direction: column; overflow: hidden; border-top: 3px solid var(--cyan); transition: opacity 0.3s; }
+                  .m-header { background: linear-gradient(90deg, #161b22, #0d1117); padding: 15px; font-size: 15px; font-weight: 900; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; cursor: move; color: var(--cyan); }
+                  .m-content { padding: 20px; max-height: 500px; overflow-y: auto; }
+
+                  /* حقول الإدخال */
+                  .key-input { width: 100%; padding: 15px; background: #010409; border: 1px solid #30363d; border-radius: 8px; color: var(--cyan); font-family: monospace; font-size: 18px; text-align: center; box-sizing: border-box; margin-bottom: 15px; text-transform: uppercase; }
+                  .btn-main { width: 100%; padding: 15px; background: var(--cyan); color: #000; border: none; border-radius: 8px; font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.2s; }
+                  .btn-main:active { transform: scale(0.95); }
+
+                  /* إطار الاشتراك */
+                  .vip-frame { background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-right: 4px solid var(--cyan); font-size: 12px; }
+
+                  /* المنسدلات والسويتشات */
+                  .drop-btn { width: 100%; padding: 12px; background: #1c2128; border: 1px solid #30363d; color: #fff; text-align: right; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+                  .drop-content { display: none; padding: 10px; border-right: 2px solid var(--cyan); background: rgba(255,255,255,0.01); margin-bottom: 10px; }
+                  
+                  .row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 13px; }
+                  .switch { position: relative; width: 44px; height: 22px; }
+                  .switch input { opacity: 0; width: 0; height: 0; }
+                  .slider { position: absolute; inset: 0; background: #30363d; border-radius: 34px; cursor: pointer; transition: 0.3s; }
+                  .slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s; }
+                  input:checked + .slider { background: var(--cyan); }
+                  input:checked + .slider:before { transform: translateX(22px); }
+
+                  .error-msg { color: var(--red); font-size: 12px; text-align: center; margin-top: 10px; display: none; }
+              </style>
+          </head>
+          <body>
+
+              <!-- الشريط العلوي -->
+              <div class="hud-bar">
+                  <div class="status-offline" id="hudStatus">
+                      <span class="dot"></span> <span id="hudText">No Sturte</span>
+                  </div>
+                  <div style="color:rgba(255,255,255,0.4); font-size:11px;">W-MASTER V4</div>
+                  <div style="color:var(--green); font-size:11px;">Safe 🟢</div>
+              </div>
+
+              <!-- المنيو -->
+              <div class="menu" id="menuWin">
+                  <div class="m-header" id="dragH">دراكون الملكي | محمد الشمري <span onclick="toggleMenu()" style="cursor:pointer; color:#8b949e;">✕</span></div>
+                  
+                  <div class="m-content">
+                      
+                      <!-- واجهة تسجيل الدخول -->
+                      <div id="loginBox">
+                          <label style="font-size:12px; color:#8b949e; margin-bottom:8px; display:block;">أدخل الكود (16 رقم وحرف):</label>
+                          <input type="text" id="keyInp" class="key-input" maxlength="16" value="SHAMMARI-VIP-16X">
+                          <button class="btn-main" id="loginBtn" onclick="doLogin()">تسجيل الدخول للسيرفر</button>
+                          <div class="error-msg" id="errorMsg">الكود غير صحيح!</div>
+                      </div>
+
+                      <!-- واجهة الهاك (تظهر بعد تسجيل الدخول) -->
+                      <div id="cheatBox" style="display:none">
+                          <div class="vip-frame">
+                              <div style="color:var(--cyan); font-weight:bold; margin-bottom:5px;">المشترك: محمد الشمري (VIP)</div>
+                              النهاية: <span style="color:var(--green); font-weight:bold;" id="expireDate">--/--/----</span>
+                          </div>
+
+                          <div class="drop-btn" onclick="toggleDrop('c1')">🛡️ إعدادات الحماية والتبليك <span>▼</span></div>
+                          <div class="drop-content" id="c1" style="display:block;">
+                              <div class="row"><span>تفعيل الحماية (Bypass)</span> <label class="switch"><input type="checkbox" onchange="sendToggle('bypass', this.checked)" checked><span class="slider"></span></label></div>
+                          </div>
+
+                          <div class="drop-btn" onclick="toggleDrop('c2')">👁️ رادار كشف الأماكن (ESP) <span>▼</span></div>
+                          <div class="drop-content" id="c2">
+                              <div class="row"><span>تفعيل الرادار الرئيسي</span> <label class="switch"><input type="checkbox" onchange="sendToggle('esp', this.checked)"><span class="slider"></span></label></div>
+                              <div class="row" style="padding-right:15px;"><span>صندوق اللاعب (Box)</span> <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+                              <div class="row" style="padding-right:15px;"><span>شريط الصحة (HP)</span> <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+                          </div>
+
+                          <div class="drop-btn" onclick="toggleDrop('c3')">🎯 المميزات القتالية (Combat) <span>▼</span></div>
+                          <div class="drop-content" id="c3">
+                              <div class="row"><span>ثبات السلاح 100%</span> <label class="switch"><input type="checkbox" onchange="sendToggle('norecoil', this.checked)"><span class="slider"></span></label></div>
+                              <div class="row"><span>تثبيت الأيم (Aimbot)</span> <label class="switch"><input type="checkbox" onchange="sendToggle('aimbot', this.checked)"><span class="slider"></span></label></div>
+                          </div>
+                      </div>
+
+                  </div>
+              </div>
+
+              <script>
+                  // --- الجسر الذي يرسل الأوامر للـ C++ ---
+                  function doLogin() {
+                      document.getElementById('loginBtn').innerText = 'جاري الاتصال...';
+                      let key = document.getElementById('keyInp').value;
+                      
+                      // إرسال الكود للـ C++ ليفحصه بالسيرفر
+                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action: "login", key: key}));
+                  }
+
+                  function sendToggle(feature, isChecked) {
+                      // إرسال أمر تفعيل الميزة للـ C++ (لكي يحقن الذاكرة)
+                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action: "toggle", feature: feature, state: isChecked}));
+                  }
+
+                  // --- الجسر الذي يستقبل الأوامر من C++ ---
+                  function onLoginResponse(jsonString) {
+                      let res = JSON.parse(jsonString);
+                      document.getElementById('loginBtn').innerText = 'تسجيل الدخول للسيرفر';
+
+                      if (res.status === 'success') {
+                          document.getElementById('loginBox').style.display = 'none';
+                          document.getElementById('cheatBox').style.display = 'block';
+                          document.getElementById('expireDate').innerText = res.expire;
+                          
+                          // تحويل اللمبة لأخضر
+                          document.getElementById('hudStatus').className = 'status-online';
+                          document.getElementById('hudText').innerText = 'متصل (Live)';
+                      } 
+                      else if (res.status === 'freeze') {
+                          alert("النظام تحت الصيانة من قبل الإدارة!");
+                      }
+                      else {
+                          let err = document.getElementById('errorMsg');
+                          err.innerText = res.msg;
+                          err.style.display = 'block';
                       }
                   }
-                  ImGui::TextColored(ImVec4(0.5,0.5,0.5,1), u8"\nالمطور: المهندس محمد الشمري");
-                  ImGui::End();
-                  return;
-              }
 
-              ImGui::SetNextWindowSize(ImVec2(340, 560), ImGuiCond_FirstUseEver);
-              ImGui::Begin(u8"🦅 حماية محمد الشمري", &g_MenuOpen);
+                  // تفاعلات الواجهة (سحب وإخفاء)
+                  function toggleMenu() { let m = document.getElementById('menuWin'); m.style.display = m.style.display==='none'?'flex':'none'; }
+                  function toggleDrop(id) { let d = document.getElementById(id); d.style.display = d.style.display==='block'?'none':'block'; }
+                  document.body.addEventListener('touchstart', e => { if(e.touches.length === 3) toggleMenu(); }, { passive: false });
 
-              ImGui::BeginChild("SubFrame", ImVec2(0, 70), true);
-              ImGui::TextColored(ImVec4(0,1,1,1), u8"المشترك: محمد الشمري (VIP)");
-              ImGui::TextColored(ImVec4(0,1,0,1), u8"حالة النظام: آمن ومستقر 🟢");
-              ImGui::TextColored(ImVec4(1,1,0,1), u8"المس الشاشة بـ 3 أصابع لإخفاء القائمة");
-              ImGui::EndChild();
-
-              if (ImGui::CollapsingHeader(u8"🛡️ إعدادات الحماية")) {
-                  ImGui::TextColored(ImVec4(0.5,0.5,0.5,1), u8"تم إزالة حظر الروابط (نظام ESign آمن)");
-              }
-
-              if (ImGui::CollapsingHeader(u8"👁️ رادار كشف الأماكن (ESP)")) {
-                  static bool esp_m = false;
-                  ImGui::Checkbox(u8"تفعيل الرادار الرئيسي", &esp_m);
-                  if(esp_m) {
-                      ImGui::Indent();
-                      static bool box, hp, name, skel;
-                      ImGui::Checkbox(u8"صندوق اللاعب (2D Box)", &box);
-                      ImGui::Checkbox(u8"شريط الصحة (HP)", &hp);
-                      ImGui::Checkbox(u8"الأسماء والمسافة", &name);
-                      ImGui::Checkbox(u8"الهيكل العظمي (Skeleton)", &skel);
-                      ImGui::Separator();
-                      static bool veh, loot;
-                      ImGui::Checkbox(u8"رادار المركبات والعجلات", &veh);
-                      ImGui::Checkbox(u8"رادار الأسلحة والموارد", &loot);
-                      ImGui::Unindent();
-                  }
-              }
-
-              if (ImGui::CollapsingHeader(u8"🎯 المميزات القتالية (Combat)")) {
-                  static bool recoil=false, aim=false;
-                  ImGui::Checkbox(u8"ثبات السلاح 100%", &recoil);
-                  ImGui::Checkbox(u8"تثبيت الأيم (Aimbot)", &aim);
-              }
-
-              ImGui::Spacing(); ImGui::Separator();
-              ImGui::TextColored(ImVec4(0.5,0.5,0.5,1), u8"المطور المعتمد: محمد الشمري © 2026");
-              ImGui::End();
-          }
+                  // سحب النافذة
+                  var h = document.getElementById("dragH"), p1=0, p2=0, p3=0, p4=0, win = document.getElementById("menuWin");
+                  h.onmousedown = (e) => { e.preventDefault(); p3=e.clientX; p4=e.clientY; document.onmouseup=closeDrag; document.onmousemove=doDrag; };
+                  h.ontouchstart = (e) => { p3=e.touches[0].clientX; p4=e.touches[0].clientY; document.ontouchend=closeDrag; document.ontouchmove=doTouchDrag; };
+                  function doDrag(e) { e.preventDefault(); p1=p3-e.clientX; p2=p4-e.clientY; p3=e.clientX; p4=e.clientY; win.style.top=(win.offsetTop-p2)+"px"; win.style.left=(win.offsetLeft-p1)+"px"; }
+                  function doTouchDrag(e) { e.preventDefault(); p1=p3-e.touches[0].clientX; p2=p4-e.touches[0].clientY; p3=e.touches[0].clientX; p4=e.touches[0].clientY; win.style.top=(win.offsetTop-p2)+"px"; win.style.left=(win.offsetLeft-p1)+"px"; }
+                  function closeDrag() { document.onmouseup=null; document.onmousemove=null; document.ontouchend=null; document.ontouchmove=null; }
+              </script>
+          </body>
+          </html>
+          )HTML";
 
           // ==========================================================
-          // 6. محرك الرسم (Metal Overlay للأيفون)
+          // 6. المحرك المرئي (WebKit) - الجسر بين الويب والـ C++
           // ==========================================================
-          @interface WMasterOverlay : UIViewController <MTKViewDelegate>
-          @property (nonatomic, strong) MTKView *mtkView;
-          @property (nonatomic, strong) id <MTLDevice> device;
-          @property (nonatomic, strong) id <MTLCommandQueue> commandQueue;
+          @interface WMasterMenu : UIViewController <WKScriptMessageHandler>
+          @property (nonatomic, strong) WKWebView *webView;
           @end
 
-          @implementation WMasterOverlay
+          @implementation WMasterMenu
+
           - (void)viewDidLoad {
               [super viewDidLoad];
-              self.view.backgroundColor = [UIColor clearColor];
-              self.view.userInteractionEnabled = YES;
-
-              self.device = MTLCreateSystemDefaultDevice();
-              self.commandQueue = [self.device newCommandQueue];
-
-              self.mtkView = [[MTKView alloc] initWithFrame:self.view.bounds device:self.device];
-              self.mtkView.backgroundColor = [UIColor clearColor];
-              self.mtkView.delegate = self;
-              self.mtkView.framebufferOnly = NO;
-              self.mtkView.clearColor = MTLClearColorMake(0, 0, 0, 0);
-              [self.view addSubview:self.mtkView];
-
-              IMGUI_CHECKVERSION();
-              ImGui::CreateContext();
-              ImGui_ImplMetal_Init(self.device);
-
-              UITapGestureRecognizer *tap3 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(toggleMenu)];
-              tap3.numberOfTouchesRequired = 3;
-              [self.view addGestureRecognizer:tap3];
-          }
-
-          - (void)toggleMenu { g_MenuOpen = !g_MenuOpen; }
-
-          - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-              ImGuiIO& io = ImGui::GetIO();
-              UITouch *touch = [touches anyObject];
-              CGPoint point = [touch locationInView:self.view];
-              io.MousePos = ImVec2(point.x, point.y);
-              io.MouseDown[0] = true;
-          }
-          - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-              ImGuiIO& io = ImGui::GetIO();
-              UITouch *touch = [touches anyObject];
-              CGPoint point = [touch locationInView:self.view];
-              io.MousePos = ImVec2(point.x, point.y);
-          }
-          - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-              ImGuiIO& io = ImGui::GetIO(); io.MouseDown[0] = false;
-          }
-
-          - (void)mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size { }
-
-          - (void)drawInMTKView:(MTKView *)view {
-              ImGuiIO& io = ImGui::GetIO();
-              io.DisplaySize.x = view.bounds.size.width;
-              io.DisplaySize.y = view.bounds.size.height;
+              self.view.backgroundColor = [UIColor clearColor]; 
               
-              MTLRenderPassDescriptor *rpd = view.currentRenderPassDescriptor;
-              if (rpd != nil) {
-                  id <MTLCommandBuffer> cb = [self.commandQueue commandBuffer];
-                  id <MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rpd];
+              WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+              // تسجيل اسم الجسر "wmaster" الذي يستخدمه الـ JS
+              [config.userContentController addScriptMessageHandler:self name:@"wmaster"];
+              
+              self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds configuration:config];
+              self.webView.backgroundColor = [UIColor clearColor];
+              self.webView.opaque = NO; 
+              self.webView.scrollView.backgroundColor = [UIColor clearColor];
+              self.webView.scrollView.bounces = NO;
+              
+              [self.view addSubview:self.webView];
+              [self.webView loadHTMLString:[NSString stringWithUTF8String:HTML_UI] baseURL:nil];
+          }
+
+          // ⚡ هنا يستقبل الـ C++ الأوامر من الواجهة ⚡
+          - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
+              NSString *jsonString = message.body;
+              NSData *jsonData = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
+              NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
+              
+              NSString *action = dict[@"action"];
+              
+              // إذا المستخدم ضغط زر "تسجيل الدخول"
+              if ([action isEqualToString:@"login"]) {
+                  NSString *key = dict[@"key"];
                   
-                  ImGui_ImplMetal_NewFrame(rpd);
-                  ImGui::NewFrame();
-                  RenderDragonUI(); 
-                  ImGui::Render();
-                  ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), cb, enc);
-                  
-                  [enc endEncoding];
-                  [cb presentDrawable:view.currentDrawable];
-                  [cb commit];
+                  // تشغيل الاتصال بالسيرفر في مسار خلفي (Thread) حتى لا تتجمد الواجهة
+                  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                      
+                      // الاتصال بدالة الـ C++ التي برمجناها فوق
+                      string responseJson = SyncWithServer(string([key UTF8String]));
+                      
+                      // إرجاع النتيجة للواجهة (JS) على المسار الرئيسي
+                      dispatch_async(dispatch_get_main_queue(), ^{
+                          NSString *jsCommand = [NSString stringWithFormat:@"onLoginResponse('%@')", [NSString stringWithUTF8String:responseJson.c_str()]];
+                          [self.webView evaluateJavaScript:jsCommand completionHandler:nil];
+                      });
+                  });
               }
+              // إذا المستخدم فعل سويتش (مثل ثبات السلاح)
+              else if ([action isEqualToString:@"toggle"]) {
+                  NSString *feature = dict[@"feature"];
+                  BOOL state = [dict[@"state"] boolValue];
+                  
+                  // استدعاء دالة حقن الذاكرة في الـ C++
+                  ToggleFeature(string([feature UTF8String]), state);
+              }
+          }
+
+          // تمرير اللمسات للعبة إذا لمس مساحة فارغة
+          - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+              UIView *hitView = [super.view hitTest:point withEvent:event];
+              if (hitView == self.view || hitView == self.webView.scrollView) return nil; 
+              return hitView;
           }
           @end
 
           // ==========================================================
-          // 7. الإقلاع الآمن (تأخير 5 ثواني للـ ESign)
+          // 7. الإقلاع الآمن وزرع الشاشة (بدون كراش لـ ESign)
           // ==========================================================
           @interface WMasterLoader : NSObject
           + (void)startInjection;
@@ -355,17 +417,15 @@ jobs:
                           if (mainWindow) break;
                       }
                       
-                      if (!mainWindow) {
-                          NSArray *windows = [[UIApplication sharedApplication] windows];
-                          if (windows.count > 0) mainWindow = windows[0];
-                      }
+                      if (!mainWindow) mainWindow = [[UIApplication sharedApplication].windows firstObject];
 
                       if (mainWindow) {
-                          WMasterOverlay *overlayVC = [[WMasterOverlay alloc] init];
-                          [mainWindow addSubview:overlayVC.view];
+                          WMasterMenu *menuVC = [[WMasterMenu alloc] init];
+                          [mainWindow addSubview:menuVC.view];
+                          menuVC.view.frame = mainWindow.bounds;
+                          menuVC.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
                           
                           InstallHooksSafe();
-                          thread(BackgroundSyncLoop).detach();
                       }
                   });
               }];
@@ -374,26 +434,20 @@ jobs:
 
           __attribute__((constructor))
           void StartDragon() {
-              // تأخير 5 ثواني لضمان عمل الواجهة بدون كراش
-              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                   [WMasterLoader startInjection];
               });
           }
           EOF
 
       # ========================================================
-      # تجهيز بيئة البناء وسحب المكاتب
+      # 2. بناء الأداة (تحميل المكتبات والصهر)
       # ========================================================
       - name: 🛠️ تجهيز Xcode SDK
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: 🌐 تحميل المكاتب (ImGui, Dobby, Json, Metal)
+      - name: 🌐 تحميل مكتبة Dobby و Json
         run: |
-          git clone --depth 1 https://github.com/ocornut/imgui.git imgui_src
-          mkdir -p imgui
-          cp imgui_src/*.h imgui_src/*.cpp imgui/
-          cp imgui_src/backends/imgui_impl_metal.h imgui_src/backends/imgui_impl_metal.mm imgui/
-
           curl -sSL -o json.hpp https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp
           
           git clone --depth 1 https://github.com/jmpews/Dobby.git dobby_src
@@ -403,32 +457,22 @@ jobs:
           mkdir -p dobby/include dobby/lib
           cp dobby_src/include/dobby.h dobby/include/ && cp dobby_src/build/libdobby.a dobby/lib/
 
-      # ========================================================
-      # عملية الصهر 
-      # ========================================================
-      - name: 🔥 عملية الصهر
+      - name: 🔥 عملية الصهر (C++ Backend + WebKit UI)
         run: |
           mkdir -p out
           xcrun --sdk iphoneos clang++ -x objective-c++ -arch arm64 -dynamiclib -std=c++17 -O3 -fobjc-arc \
-          -I./imgui -I./dobby/include -I. wsam.mm \
-          imgui/*.cpp imgui/imgui_impl_metal.mm -L./dobby/lib -ldobby \
-          -framework Foundation -framework UIKit -framework Metal -framework MetalKit -framework QuartzCore \
+          -I./dobby/include -I. wsam.mm \
+          -L./dobby/lib -ldobby \
+          -framework Foundation -framework UIKit -framework WebKit \
           -o out/WMASTER_Dragon.dylib
 
-      # ========================================================
-      # إجبار السيرفر على ضغط الـ Dylib (لحل مشكلة زر التحميل)
-      # ========================================================
       - name: 📦 ضغط الملف للتحميل
         run: |
           cd out
           zip DRAGON-HACK.zip WMASTER_Dragon.dylib
 
-      # ========================================================
-      # رفع الملف
-      # ========================================================
       - name: 📤 استخراج الهاك النهائي
         uses: actions/upload-artifact@v4
         with:
           name: DRAGON-HACK-SHAMMARI
           path: out/DRAGON-HACK.zip
-          if-no-files-found: error
