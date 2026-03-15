@@ -20,26 +20,27 @@ jobs:
           echo "✅ ImGui Metal backend is ready!"
 
       - name: Setup Theos
-        # استخدمنا هنا التوكن الخاص بجيت هوب لإجبار النظام على التحميل بدون طلب يوزر وباسورد
+        # هذا المتغير يمنع جيت هوب من طلب اسم المستخدم والباسورد
+        env:
+          GIT_TERMINAL_PROMPT: 0
         run: |
           sudo xcode-select -s /Applications/Xcode.app
           export THEOS=~/theos
           rm -rf $THEOS
-          git clone --recursive --quiet --depth 1 https://github.com/theos/theos.git $THEOS
+          # تحميل Theos الأساسي
+          git clone --recursive --depth 1 https://github.com/theos/theos.git $THEOS
           
-          # حل مشكلة الـ SDKs الجذري
-          mkdir -p $THEOS/sdks
-          cd $THEOS/sdks
-          # تحميل الـ SDK 16.5 مباشرة (الأكثر استقراراً لبوبجي) عن طريق رابط مباشر لتجنب تعقيدات git clone
-          curl -LO https://github.com/theos/sdks/raw/master/iPhoneOS16.5.sdk.tar.xz
-          tar -xf iPhoneOS16.5.sdk.tar.xz
-          rm iPhoneOS16.5.sdk.tar.xz
+          # تنظيف مجلد الـ SDKs تماماً
+          rm -rf $THEOS/sdks
+          # تحميل الـ SDKs من مصدر (Mirror) فائق الاستقرار ومخصص لجيت هوب أكشنز
+          git clone --depth 1 https://github.com/Theos-SDKS/iOS-SDKs.git $THEOS/sdks
           
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Build Dylib
         run: |
           export THEOS=~/theos
+          # تنفيذ بناء ملف الـ dylib
           make package FINALPACKAGE=1
           
       - name: Upload Build
@@ -47,4 +48,3 @@ jobs:
         with:
           name: Wessam-Pro-Build
           path: packages/*.deb
-          
