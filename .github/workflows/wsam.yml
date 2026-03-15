@@ -1,4 +1,4 @@
-name: 🐲 DRAGON HACK - RESIZABLE TRANSPARENT SYSTEM (ALI)
+name: 🐲 DRAGON HACK - IMPERIAL FINAL BUILD
 
 on:
   push:
@@ -6,18 +6,18 @@ on:
   workflow_dispatch: 
 
 jobs:
-  build_dragon_final:
-    name: 🛠️ صهر منظومة محمد الشمري الملكية
+  build_imperial_system:
+    name: 🛠️ صهر منظومة محمد الشمري النهائية
     runs-on: macos-latest
 
     steps:
       - name: 📥 جلب المستودع
         uses: actions/checkout@v4
 
-      - name: ⚙️ تجهيز بيئة البناء
+      - name: ⚙️ تجهيز أدوات بناء الآيفون
         run: brew install ldid
 
-      - name: 📝 توليد المحرك والواجهة الشفافة (engine.mm)
+      - name: 📝 توليد المحرك والواجهة (engine.mm)
         run: |
           cat << 'EOF_MM' > engine.mm
           #import <Foundation/Foundation.h>
@@ -28,21 +28,31 @@ jobs:
           #include <cmath>
           #include <thread>
           #include <unistd.h>
-          #include <mach-o/dyld.h>
 
           using namespace std;
 
           // ==========================================================
-          // 1. [إعدادات المحرك]
+          // 1. [هيكل الإعدادات - التفعيلات]
           // ==========================================================
           struct HackConfig {
-              bool radar = true;
               bool aimbot = false;
-              bool norecoil = false;
+              float aimFov = 100.0f;
+              bool esp_name = true;
+              bool esp_box = true;
+              bool esp_skel = true;
+              bool esp_hp = true;
+              bool esp_wpn = true;
+              bool esp_arr = true;
+              bool cheeks = true; // ميزتك المفضلة 😊
+              
+              float boxThick = 2.0f;
+              float lineThick = 1.5f;
+              float fontSize = 12.0f;
+              float hpThick = 10.0f;
           } Config;
 
           // ==========================================================
-          // 2. [واجهة الويب الشفافة والقابلة للتحجيم] 🎨
+          // 2. [واجهة الويب الإمبراطورية المدمجة] 🎨
           // ==========================================================
           const char* HTML_UI = R"HTML(
           <!DOCTYPE html>
@@ -51,187 +61,148 @@ jobs:
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
               <style>
-                  :root { 
-                      --yellow: #FFD700; 
-                      --bg: rgba(10, 10, 10, 0.6); /* خلفية شفافة */
-                      --red: #ff3333; 
-                      --green: #39ff14; 
-                      --base-scale: 1; /* متغير التحكم في حجم المحتويات */
-                  }
-                  
-                  body { margin:0; padding:0; background:transparent; font-family:Tahoma; color:#fff; user-select:none; overflow:hidden; }
+                  :root { --yellow: #FFD700; --bg: rgba(10, 10, 10, 0.4); --red: #ff2a2a; --green: #39ff14; --base-scale: 1; }
+                  body { margin:0; padding:0; background:transparent; font-family: 'Segoe UI', Tahoma, sans-serif; color:#fff; user-select:none; overflow:hidden; }
                   .interactive { pointer-events: auto; }
-                  
-                  /* عداد الأعداء العلوي */
-                  .enemy-count { position:fixed; top:15px; left:50%; transform:translateX(-50%); color:var(--yellow); font-size:26px; font-weight:900; text-shadow:3px 3px 0 #000; z-index:5; }
-
-                  /* المنيو الشفاف القابل للتحجيم */
+                  .enemy-count { position:fixed; top:15px; left:50%; transform:translateX(-50%); color:var(--yellow); font-size:28px; font-weight:900; text-shadow:3px 3px 0 #000; z-index:5; }
                   #mod-menu { 
-                      position:fixed; top:60px; left:25px; 
-                      width:calc(340px * var(--base-scale)); 
-                      background:var(--bg); 
-                      backdrop-filter: blur(12px); /* تأثير الضباب */
-                      border:1.2px solid var(--yellow); 
-                      border-radius:10px; 
-                      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-                      display:flex; flex-direction:column; z-index:100; 
-                      overflow: hidden;
+                      position:fixed; top:70px; left:30px; width:calc(340px * var(--base-scale)); 
+                      background:var(--bg); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+                      border:1.5px solid rgba(255, 215, 0, 0.5); border-radius:15px; display:flex; flex-direction:column; z-index:100; overflow: hidden;
+                      box-shadow: 0 10px 50px rgba(0,0,0,0.8); touch-action: none; transition: opacity 0.3s ease;
                   }
-
-                  .header { 
-                      background:rgba(0,0,0,0.4); 
-                      padding:calc(10px * var(--base-scale)); 
-                      display:flex; justify-content:space-between; align-items:center; 
-                      border-bottom:1px solid var(--yellow); cursor:move; 
-                  }
-                  .header-title { font-size:calc(12px * var(--base-scale)); color:var(--yellow); font-weight:bold; }
-
-                  .content { padding:calc(10px * var(--base-scale)); flex: 1; overflow-y: auto; }
-                  
-                  .section-title { 
-                      color:var(--yellow); 
-                      font-size:calc(11px * var(--base-scale)); 
-                      font-weight:bold; text-align:center; 
-                      padding:calc(10px * var(--base-scale)) 0; 
-                      border-bottom:1px solid rgba(255,215,0,0.1); 
-                      margin:0 calc(20px * var(--base-scale)); 
-                  }
-
-                  .item-row { 
-                      display:flex; justify-content:space-between; align-items:center; 
-                      padding:calc(10px * var(--base-scale)) calc(15px * var(--base-scale)); 
-                      font-size:calc(12px * var(--base-scale));
-                  }
-
-                  .toggle { 
-                      background:var(--yellow); color:#000; 
-                      padding:calc(3px * var(--base-scale)) calc(10px * var(--base-scale)); 
-                      font-size:calc(10px * var(--base-scale)); 
-                      font-weight:900; border-radius:4px; min-width:calc(35px * var(--base-scale)); text-align:center; 
-                  }
-                  .off { background:var(--red); color:#fff; }
-
-                  .footer { 
-                      padding:calc(10px * var(--base-scale)); 
-                      text-align:center; border-top:1px solid var(--yellow); 
-                      background:rgba(0,0,0,0.3); position: relative;
-                  }
-
-                  /* مقبض التحجيم (Resize Handle) */
-                  .resize-handle {
-                      position: absolute; right: 0; bottom: 0; 
-                      width: calc(25px * var(--base-scale)); height: calc(25px * var(--base-scale)); 
-                      cursor: nwse-resize; 
-                      background: linear-gradient(135deg, transparent 50%, var(--yellow) 50%);
-                      opacity: 0.7;
-                  }
-
-                  #esp-canvas { position:fixed; inset:0; pointer-events:none; z-index:2; }
+                  .header { background:rgba(0,0,0,0.5); padding:calc(10px * var(--base-scale)); display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid var(--yellow); cursor: move; }
+                  .header-title { font-size: calc(13px * var(--base-scale)); color: var(--yellow); font-weight: 900; pointer-events: none; }
+                  .content { padding:calc(10px * var(--base-scale)); flex: 1; overflow-y: auto; max-height: calc(520px * var(--base-scale)); }
+                  .section-title { color:var(--yellow); font-size:calc(10px * var(--base-scale)); font-weight:bold; text-align:right; padding:10px 5px 5px; border-bottom:1px solid rgba(255,215,0,0.2); margin-bottom: 8px; }
+                  .item-row { display:flex; justify-content:space-between; align-items:center; padding:calc(8px * var(--base-scale)) calc(12px * var(--base-scale)); background: rgba(255,255,255,0.03); margin-bottom: 4px; border-radius: 8px; cursor: pointer; }
+                  .item-name { font-size:calc(11.5px * var(--base-scale)); font-weight:bold; color:#eee; pointer-events: none; }
+                  .toggle { background:var(--yellow); color:#000; padding:calc(4px * var(--base-scale)) calc(10px * var(--base-scale)); font-size:calc(10px * var(--base-scale)); font-weight:900; border-radius:5px; min-width:calc(40px * var(--base-scale)); text-align:center; }
+                  .toggle.off { background:var(--red); color:#fff; }
+                  .bone-selector { display: flex; gap: 5px; margin-top: 5px; }
+                  .bone-btn { flex: 1; padding: 6px; background: rgba(255,215,0,0.1); border: 1px solid var(--yellow); border-radius: 5px; font-size: 9px; color: var(--yellow); text-align: center; }
+                  .bone-btn.active { background: var(--yellow); color: #000; font-weight: bold; }
+                  .settings-nav-btn { width: 100%; padding: calc(12px * var(--base-scale)); background: linear-gradient(90deg, rgba(255,215,0,0.25), rgba(255,215,0,0.05)); border: 1px dashed var(--yellow); color: var(--yellow); text-align: center; font-weight: 900; font-size: calc(11px * var(--base-scale)); margin: 15px 0 5px; border-radius: 12px; cursor: pointer; }
+                  .slider-row { padding: 8px 15px 12px; }
+                  .slider-label { display: flex; justify-content: space-between; font-size: calc(9.5px * var(--base-scale)); color: #ccc; margin-bottom: 6px; font-weight: bold; }
+                  .slider-label b { color: var(--yellow); }
+                  input[type=range] { -webkit-appearance: none; width: 100%; height: 3px; background: #333; outline: none; border-radius: 10px; }
+                  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: calc(16px * var(--base-scale)); height: calc(16px * var(--base-scale)); background: var(--yellow); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--yellow); }
+                  .footer { padding: calc(10px * var(--base-scale)); text-align: center; border-top: 1px solid rgba(255,215,0,0.2); background: rgba(0,0,0,0.4); position: relative; }
+                  .resize-handle { position: absolute; right: 0; bottom: 0; width: 30px; height: 30px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--yellow) 50%); opacity: 0.8; }
+                  #esp-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
               </style>
           </head>
           <body>
-              <div class="enemy-count">الاعـداء: 1</div>
+              <div class="enemy-count" id="count-ui">الاعـداء: 1</div>
               <canvas id="esp-canvas"></canvas>
-
               <div id="mod-menu" class="interactive">
-                  <div class="header" id="drag">
-                      <span style="color:var(--yellow); font-weight:bold; cursor:pointer;" onclick="toggleCollapse()">[-]</span>
-                      <span class="header-title">دراكون شيتو | التحجيم الذكي</span>
-                      <span style="font-size:8px; border:1px solid var(--yellow); padding:1px 3px;">PRO</span>
+                  <div class="header" id="drag-handle">
+                      <span style="color:var(--yellow); font-weight:900; font-size:18px;">≡</span>
+                      <span class="header-title">دراكون شيتو | المطور محمد الشمري</span>
+                      <button onclick="toggleCollapse()" style="background:transparent; border:none; color:var(--yellow); font-weight:bold; font-size:16px;">[-]</button>
                   </div>
-
-                  <div id="m-body" class="content">
-                      <div class="section-title">إعدادات الرادار الملكي</div>
-                      <div class="item-row" onclick="tgl('radar', this)"><span>تفعيل الرادار</span><span class="toggle">ON</span></div>
-                      
-                      <div class="section-title">التفعيلات (MODS)</div>
-                      <div class="item-row" onclick="tgl('aim', this)"><span>ايمبوت (Aimbot)</span><span class="toggle off">OFF</span></div>
-                      <div class="item-row" onclick="tgl('recoil', this)"><span>ثبات السلاح 100%</span><span class="toggle off">OFF</span></div>
+                  <div id="m-content" class="content">
+                      <div id="p-main">
+                          <div class="section-title">نظام الايمبوت (AIMBOT)</div>
+                          <div class="item-row" onclick="handleTgl('aim', this)"><span>تفعيل محرك الايمبوت</span><span class="toggle off">OFF</span></div>
+                          <div class="slider-row">
+                              <div class="slider-label"><span>نطاق الرؤية (FOV)</span><b id="v-fov">100°</b></div>
+                              <input type="range" min="30" max="400" value="100" oninput="updVal('fov', this.value, 'v-fov')">
+                          </div>
+                          <div class="bone-selector">
+                              <div class="bone-btn active" onclick="setB('head', this)">رأس</div>
+                              <div class="bone-btn" onclick="setB('chest', this)">صدر</div>
+                              <div class="bone-btn" onclick="setB('foot', this)">قدم</div>
+                          </div>
+                          <div class="section-title">خصائص الرادار (ESP)</div>
+                          <div class="item-row" onclick="handleTgl('esp_name', this)"><span>إظهار الاسم والمسافة</span><span class="toggle">ON</span></div>
+                          <div class="item-row" onclick="handleTgl('esp_box', this)"><span>تفعيل الصندوق المربع</span><span class="toggle">ON</span></div>
+                          <div class="item-row" onclick="handleTgl('esp_skel', this)"><span>تفعيل الهيكل العظمي</span><span class="toggle">ON</span></div>
+                          <div class="item-row" onclick="handleTgl('esp_hp', this)"><span>شريط الصحة العريض</span><span class="toggle">ON</span></div>
+                          <div class="item-row" onclick="handleTgl('esp_arr', this)"><span>اتجاهات الأسهم ==></span><span class="toggle">ON</span></div>
+                          <div class="section-title">إضافات خاصة 😊</div>
+                          <div class="item-row" onclick="handleTgl('cheeks', this)"><span class="item-name" style="color:#ff85ff;">تفعيل الخدود الطويلة 😊</span><span class="toggle">ON</span></div>
+                          <div class="settings-nav-btn" onclick="switchP('set')">⚙️ ضبط أحجام وسمك الرادار ↘</div>
+                      </div>
+                      <div id="p-set" style="display:none;">
+                          <div class="section-title">تحكم أحجام الخصائص</div>
+                          <div class="slider-row"><div class="slider-label"><span>سمك الصندوق</span><b id="v-box">2.0px</b></div><input type="range" min="1" max="8" step="0.5" value="2" oninput="updStl('--box-thick', this.value, 'v-box')"></div>
+                          <div class="slider-row"><div class="slider-label"><span>عرض الصحة</span><b id="v-hp">10px</b></div><input type="range" min="4" max="25" step="1" value="10" oninput="updStl('--hp-thick', this.value, 'v-hp')"></div>
+                          <div class="settings-nav-btn" onclick="switchP('main')">← عودة لقائمة التفعيلات</div>
+                      </div>
                   </div>
-
-                  <div class="footer">
-                      <span style="color:#eee; font-size:10px; font-weight:bold;">اسحب من الزاوية للتحجيم ↘</span>
-                      <div class="resize-handle" id="resizer"></div>
-                  </div>
+                  <div class="footer"><span style="color:#bbb; font-size:10px; font-weight:bold;">انقر مرتين بـ 3 أصابع للإخفاء</span><div class="resize-handle" id="resizer"></div></div>
               </div>
-
               <script>
-                  function tgl(feat, el) {
-                      let btn = el.querySelector('.toggle');
-                      let state = btn.innerText === 'ON' ? false : true;
-                      btn.innerText = state ? 'ON' : 'OFF';
-                      btn.className = state ? 'toggle' : 'toggle off';
-                      window.webkit.messageHandlers.wmaster.postMessage({action:"tgl", feature:feat, state:state});
-                  }
-
-                  function toggleCollapse() {
-                      let body = document.getElementById('m-body');
-                      body.style.display = body.style.display === 'none' ? 'block' : 'none';
-                  }
-
-                  // --- نظام التحجيم باليد (Resize Logic) ---
-                  const menu = document.getElementById('mod-menu');
-                  const resizer = document.getElementById('resizer');
-                  
-                  resizer.addEventListener('touchstart', (e) => {
-                      let startX = e.touches[0].clientX;
-                      let startWidth = menu.offsetWidth;
-                      
-                      function onTouchMove(e) {
-                          let newWidth = startWidth + (e.touches[0].clientX - startX);
-                          if (newWidth > 240 && newWidth < 600) {
-                              menu.style.width = newWidth + 'px';
-                              // تحديث الـ Scale بناءً على العرض (العرض الأصلي 340)
-                              let scale = newWidth / 340;
-                              document.documentElement.style.setProperty('--base-scale', scale);
+                  let config = { aim: false, fov: 100, esp_name: true, esp_box: true, esp_skel: true, esp_hp: true, esp_arr: true, cheeks: true };
+                  let lastTouch = 0;
+                  document.addEventListener('touchstart', (e) => {
+                      if (e.touches.length === 3) {
+                          let now = Date.now();
+                          if (now - lastTouch < 400) {
+                              const m = document.getElementById('mod-menu');
+                              m.style.opacity = m.style.opacity === '0' ? '1' : '0';
+                              m.style.pointerEvents = m.style.opacity === '0' ? 'none' : 'auto';
                           }
+                          lastTouch = now;
                       }
-                      
-                      function onTouchEnd() {
-                          document.removeEventListener('touchmove', onTouchMove);
-                          document.removeEventListener('touchend', onTouchEnd);
-                      }
-                      
-                      document.addEventListener('touchmove', onTouchMove);
-                      document.addEventListener('touchend', onTouchEnd);
                   });
-
-                  // --- نظام الرسم ESP ---
+                  function handleTgl(f, el) {
+                      let btn = el.querySelector('.toggle');
+                      config[f] = btn.innerText !== 'ON';
+                      btn.innerText = config[f] ? 'ON' : 'OFF';
+                      btn.className = config[f] ? 'toggle' : 'toggle off';
+                      window.webkit.messageHandlers.wmaster.postMessage({action:"tgl", feature:f, state:config[f]});
+                  }
+                  function updVal(f, v, tid) { document.getElementById(tid).innerText = v + '°'; config[f] = parseFloat(v); window.webkit.messageHandlers.wmaster.postMessage({action:"sld", feature:f, value:parseFloat(v)}); }
+                  function updStl(p, v, tid) { document.documentElement.style.setProperty(p, v + 'px'); document.getElementById(tid).innerText = v + 'px'; }
+                  function setB(b, el) { document.querySelectorAll('.bone-btn').forEach(bn => bn.classList.remove('active')); el.classList.add('active'); }
+                  function switchP(p) { document.getElementById('p-main').style.display = p === 'main' ? 'block' : 'none'; document.getElementById('p-set').style.display = p === 'set' ? 'block' : 'none'; }
+                  function toggleCollapse() { let c = document.getElementById('m-content'); c.style.display = c.style.display === 'none' ? 'block' : 'none'; }
+                  const menu = document.getElementById('mod-menu');
+                  const header = document.getElementById('drag-handle');
+                  let oX, oY;
+                  header.addEventListener('touchstart', (e) => { oX = e.touches[0].clientX - menu.offsetLeft; oY = e.touches[0].clientY - menu.offsetTop; });
+                  header.addEventListener('touchmove', (e) => { e.preventDefault(); menu.style.left = (e.touches[0].clientX - oX) + 'px'; menu.style.top = (e.touches[0].clientY - oY) + 'px'; });
+                  const resizer = document.getElementById('resizer');
+                  resizer.addEventListener('touchstart', (e) => {
+                      let sX = e.touches[0].clientX, sY = e.touches[0].clientY, sW = menu.offsetWidth, sH = menu.offsetHeight;
+                      function move(ev) {
+                          let nW = sW + (ev.touches[0].clientX - sX);
+                          let nH = sH + (ev.touches[0].clientY - sY);
+                          if (nW > 250 && nW < 800) { menu.style.width = nW + 'px'; document.documentElement.style.setProperty('--base-scale', nW / 340); }
+                          if (nH > 150) menu.style.height = nH + 'px';
+                      }
+                      function end() { document.removeEventListener('touchmove', move); }
+                      document.addEventListener('touchmove', move); document.addEventListener('touchend', end);
+                  });
                   const cvs = document.getElementById('esp-canvas');
                   const ctx = cvs.getContext('2d');
                   cvs.width = window.innerWidth; cvs.height = window.innerHeight;
-                  let enemies = [];
-
-                  function updateESP(data) { enemies = JSON.parse(data); }
-
-                  function draw() {
-                      ctx.clearRect(0,0,cvs.width,cvs.height);
-                      enemies.forEach(e => {
+                  let entities = [];
+                  function updateESP(data) { entities = JSON.parse(data); }
+                  function render() {
+                      ctx.clearRect(0, 0, cvs.width, cvs.height);
+                      if (config.aim) { ctx.strokeStyle = "rgba(255, 215, 0, 0.4)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cvs.width/2, cvs.height/2, config.fov, 0, Math.PI*2); ctx.stroke(); }
+                      entities.forEach(e => {
+                          const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--base-scale'));
+                          const bT = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--box-thick'));
+                          const fS = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size'));
+                          const hpT = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hp-thick'));
                           ctx.strokeStyle = "#FFD700"; ctx.fillStyle = "#FFD700";
-                          ctx.lineWidth = 2.0;
-
-                          // 1. الاسم (الأعلى)
-                          ctx.font = "bold 13px Tahoma"; ctx.textAlign = "center";
-                          ctx.fillText(e.name + " [" + e.dist + "m]", e.x, e.y - e.h/2 - 30);
-
-                          // 2. الصندوق مربع الأضلاع
-                          ctx.strokeRect(e.x - e.w/2, e.y - e.h/2, e.w, e.h);
-
-                          // 3. الصحة (عريضة بالأسفل)
-                          ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(e.x - e.w/2, e.y + e.h/2 + 5, e.w, 8);
-                          ctx.fillStyle = "#39ff14"; ctx.fillRect(e.x - e.w/2, e.y + e.h/2 + 5, e.w * (e.hp/100), 8);
-
-                          // 4. السلاح
-                          ctx.fillStyle = "#fff"; ctx.font = "bold 10px Tahoma";
-                          ctx.fillText(e.weapon, e.x, e.y + e.h/2 + 25);
-                          
-                          // خط اللاين من تحت كلمة الاعداء
-                          ctx.strokeStyle = "#FFD700"; ctx.beginPath();
-                          ctx.moveTo(cvs.width/2, 45); ctx.lineTo(e.x, e.y - e.h/2); ctx.stroke();
+                          if (config.esp_name || config.esp_arr) {
+                              ctx.font = `bold ${fS}px Tahoma`; ctx.textAlign = "center";
+                              ctx.fillText((config.esp_name ? e.name + " [" + e.dist + "m] " : "") + (config.esp_arr ? "==>" : ""), e.x, e.y - e.h/2 - 35);
+                          }
+                          if (config.esp_box) { ctx.lineWidth = bT; ctx.strokeRect(e.x - e.w/2, e.y - e.h/2, e.w, e.h); }
+                          if (config.esp_hp) { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(e.x - e.w/2, e.y + e.h/2 + 10, e.w, hpT); ctx.fillStyle = "#39ff14"; ctx.fillRect(e.x - e.w/2, e.y + e.h/2 + 10, e.w * (e.hp/100), hpT); }
+                          ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 1.5;
+                          ctx.beginPath(); ctx.moveTo(cvs.width/2, 45); ctx.lineTo(e.x, e.y - e.h/2); ctx.stroke();
                       });
-                      requestAnimationFrame(draw);
+                      requestAnimationFrame(render);
                   }
-                  draw();
+                  render();
               </script>
           </body>
           </html>
@@ -247,35 +218,32 @@ jobs:
           @implementation DragonMenu
           - (void)viewDidLoad {
               [super viewDidLoad];
-              
-              // جعل الخلفية شفافة تماماً في نظام iOS
               self.view.backgroundColor = [UIColor clearColor];
-              
               WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
               [config.userContentController addScriptMessageHandler:self name:@"wmaster"];
-              
               self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds configuration:config];
               self.webView.backgroundColor = [UIColor clearColor];
-              self.webView.opaque = NO; // مهم جداً للشفافية
-              self.webView.scrollView.backgroundColor = [UIColor clearColor];
-              
+              self.webView.opaque = NO;
               [self.view addSubview:self.webView];
               [self.webView loadHTMLString:[NSString stringWithUTF8String:HTML_UI] baseURL:nil];
-              
               dispatch_async(dispatch_get_global_queue(0, 0), ^{ [self MainLoop]; });
           }
 
           - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
               NSDictionary *dict = message.body;
-              NSString *feat = dict[@"feature"];
-              bool state = [dict[@"state"] boolValue];
-              if([feat isEqualToString:@"radar"]) Config.radar = state;
-              if([feat isEqualToString:@"aim"]) Config.aimbot = state;
+              NSString *action = dict[@"action"];
+              if ([action isEqualToString:@"tgl"]) {
+                  NSString *feat = dict[@"feature"];
+                  bool state = [dict[@"state"] boolValue];
+                  if([feat isEqualToString:@"aim"]) Config.aimbot = state;
+                  if([feat isEqualToString:@"cheeks"]) Config.cheeks = state;
+              }
           }
 
           - (void)MainLoop {
               while(true) {
-                  NSString *json = @"[{\"name\":\"بـوت_الشـمري\",\"dist\":\"120\",\"x\":500,\"y\":300,\"w\":80,\"h\":160,\"hp\":85,\"weapon\":\"M416 🔫\"}]";
+                  // هنا يتم استبدال البيانات بمحاكاة ذكية ترسل للواجهة
+                  NSString *json = @"[{\"name\":\"بـوت_الشـمري\",\"dist\":\"120\",\"hp\":85,\"weapon\":\"M416\",\"x\":500,\"y\":300,\"w\":85,\"h\":170}]";
                   dispatch_async(dispatch_get_main_queue(), ^{
                       [self.webView evaluateJavaScript:[NSString stringWithFormat:@"updateESP('%@')", json] completionHandler:nil];
                   });
@@ -294,15 +262,16 @@ jobs:
           }
           EOF_MM
 
-      - name: 🔥 صهر المنظومة إلى Dylib
+      - name: 🔥 صهر المنظومة الإمبراطورية النهائية
         run: |
           xcrun -sdk iphoneos clang++ -arch arm64 -shared -std=c++17 -fPIC -framework Foundation -framework UIKit -framework WebKit engine.mm -o DragonCheeto.dylib
+          echo "تم الصهر بنجاح! ✅"
 
-      - name: 🔏 توقيع ملف الدايلب (ldid)
+      - name: 🔏 توقيع ملف الدايلب
         run: ldid -S DragonCheeto.dylib
 
       - name: 🚀 تصدير الملف النهائي
         uses: actions/upload-artifact@v4
         with:
-          name: 🐲 Resizable_Transparent_Dylib
+          name: 🐲 Dragon_Final_Imperial_Dylib
           path: DragonCheeto.dylib
