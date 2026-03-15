@@ -17,30 +17,24 @@ jobs:
           cp temp_imgui/*.h ImGui/
           cp temp_imgui/backends/imgui_impl_metal.* ImGui/
           rm -rf temp_imgui
-          echo "✅ ImGui Metal backend is ready!"
 
       - name: Setup Theos
         run: |
           sudo xcode-select -s /Applications/Xcode.app
-          # تثبيت أداة التوقيع ldid لحل خطأ Signing
           brew install ldid
-          
           export THEOS=~/theos
           rm -rf $THEOS
           git clone --recursive --depth 1 https://github.com/theos/theos.git $THEOS
-          
           mkdir -p $THEOS/sdks
           curl -L https://github.com/theos/sdks/archive/master.zip -o sdks.zip
           unzip -q sdks.zip -d $THEOS/sdks
           mv $THEOS/sdks/sdks-master/* $THEOS/sdks/
           rm -rf $THEOS/sdks/sdks-master sdks.zip
-          
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Build Dylib
         run: |
           export THEOS=~/theos
-          # بناء المود
           make package FINALPACKAGE=1
           
       - name: Upload Build
