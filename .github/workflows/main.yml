@@ -22,17 +22,16 @@ jobs:
       - name: Setup Theos
         run: |
           sudo xcode-select -s /Applications/Xcode.app
+          # تثبيت أداة التوقيع ldid لحل خطأ Signing
+          brew install ldid
+          
           export THEOS=~/theos
           rm -rf $THEOS
-          # تحميل Theos الأساسي
           git clone --recursive --depth 1 https://github.com/theos/theos.git $THEOS
           
-          # تحميل الـ SDKs كملف ZIP لتجنب مشكلة اليوزر نيم
           mkdir -p $THEOS/sdks
           curl -L https://github.com/theos/sdks/archive/master.zip -o sdks.zip
           unzip -q sdks.zip -d $THEOS/sdks
-          
-          # ترتيب الملفات في مكانها الصحيح
           mv $THEOS/sdks/sdks-master/* $THEOS/sdks/
           rm -rf $THEOS/sdks/sdks-master sdks.zip
           
@@ -41,7 +40,7 @@ jobs:
       - name: Build Dylib
         run: |
           export THEOS=~/theos
-          # بناء المشروع
+          # بناء المود
           make package FINALPACKAGE=1
           
       - name: Upload Build
