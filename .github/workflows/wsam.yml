@@ -1,4 +1,4 @@
-name: 🐲 DRAGON HACK - FULL SYSTEM (IOS DYLIB)
+name: 🐲 DRAGON HACK - RESIZABLE TRANSPARENT SYSTEM (ALI)
 
 on:
   push:
@@ -7,17 +7,17 @@ on:
 
 jobs:
   build_dragon_final:
-    name: 🛠️ صهر محرك الشيتو (محمد الشمري)
+    name: 🛠️ صهر منظومة محمد الشمري الملكية
     runs-on: macos-latest
 
     steps:
       - name: 📥 جلب المستودع
         uses: actions/checkout@v4
 
-      - name: ⚙️ تجهيز أدوات بناء الآيفون
+      - name: ⚙️ تجهيز بيئة البناء
         run: brew install ldid
 
-      - name: 📝 توليد محرك المنظومة (engine.mm)
+      - name: 📝 توليد المحرك والواجهة الشفافة (engine.mm)
         run: |
           cat << 'EOF_MM' > engine.mm
           #import <Foundation/Foundation.h>
@@ -28,27 +28,21 @@ jobs:
           #include <cmath>
           #include <thread>
           #include <unistd.h>
+          #include <mach-o/dyld.h>
 
           using namespace std;
 
           // ==========================================================
-          // 1. [إعدادات التفعيلات والسلايدرات]
+          // 1. [إعدادات المحرك]
           // ==========================================================
           struct HackConfig {
               bool radar = true;
               bool aimbot = false;
               bool norecoil = false;
-              bool longCheeks = true; // ميزتك المفضلة 😊
-              
-              // قيم السلايدرات
-              float boxThick = 1.5f;
-              float lineThick = 1.5f;
-              float infoSize = 11.0f;
-              float cheekIntensity = 1.8f; 
           } Config;
 
           // ==========================================================
-          // 2. [واجهة الويب الملكية - HTML/CSS/JS]
+          // 2. [واجهة الويب الشفافة والقابلة للتحجيم] 🎨
           // ==========================================================
           const char* HTML_UI = R"HTML(
           <!DOCTYPE html>
@@ -57,44 +51,81 @@ jobs:
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
               <style>
-                  :root { --yellow: #FFD700; --bg: rgba(5,5,5,0.98); --red: #ff2a2a; --green: #39ff14; }
+                  :root { 
+                      --yellow: #FFD700; 
+                      --bg: rgba(10, 10, 10, 0.6); /* خلفية شفافة */
+                      --red: #ff3333; 
+                      --green: #39ff14; 
+                      --base-scale: 1; /* متغير التحكم في حجم المحتويات */
+                  }
+                  
                   body { margin:0; padding:0; background:transparent; font-family:Tahoma; color:#fff; user-select:none; overflow:hidden; }
                   .interactive { pointer-events: auto; }
                   
-                  /* عداد الأعداء */
-                  .enemy-count { position:fixed; top:15px; left:50%; transform:translateX(-50%); color:var(--yellow); font-size:26px; font-weight:900; text-shadow:2px 2px #000; z-index:5; }
+                  /* عداد الأعداء العلوي */
+                  .enemy-count { position:fixed; top:15px; left:50%; transform:translateX(-50%); color:var(--yellow); font-size:26px; font-weight:900; text-shadow:3px 3px 0 #000; z-index:5; }
 
-                  /* المنيو الملكي */
-                  #mod-menu { position:fixed; top:60px; left:20px; width:340px; background:var(--bg); border:1.2px solid var(--yellow); border-radius:4px; box-shadow:0 0 30px #000; display:flex; flex-direction:column; z-index:100; }
-                  .header { background:#000; padding:10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--yellow); cursor:move; }
+                  /* المنيو الشفاف القابل للتحجيم */
+                  #mod-menu { 
+                      position:fixed; top:60px; left:25px; 
+                      width:calc(340px * var(--base-scale)); 
+                      background:var(--bg); 
+                      backdrop-filter: blur(12px); /* تأثير الضباب */
+                      border:1.2px solid var(--yellow); 
+                      border-radius:10px; 
+                      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                      display:flex; flex-direction:column; z-index:100; 
+                      overflow: hidden;
+                  }
+
+                  .header { 
+                      background:rgba(0,0,0,0.4); 
+                      padding:calc(10px * var(--base-scale)); 
+                      display:flex; justify-content:space-between; align-items:center; 
+                      border-bottom:1px solid var(--yellow); cursor:move; 
+                  }
+                  .header-title { font-size:calc(12px * var(--base-scale)); color:var(--yellow); font-weight:bold; }
+
+                  .content { padding:calc(10px * var(--base-scale)); flex: 1; overflow-y: auto; }
                   
-                  /* بطاقة الاشتراك */
-                  .sub-card { background:#000; border:1px solid rgba(255,215,0,0.5); margin:8px; padding:8px; border-radius:3px; }
-                  .sub-row { display:flex; justify-content:space-between; font-size:9px; color:#888; font-weight:bold; margin-bottom:4px; }
-                  .sub-row b { color:var(--yellow); }
-                  .status-frames { display:flex; gap:6px; margin-top:4px; }
-                  .s-frame { flex:1; border:1px solid #333; padding:4px; border-radius:2px; display:flex; align-items:center; justify-content:center; gap:5px; font-size:8.5px; font-weight:900; }
-                  .led { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 5px var(--green); animation:blink 1.5s infinite; }
-                  @keyframes blink { 50% { opacity: 0.2; } }
+                  .section-title { 
+                      color:var(--yellow); 
+                      font-size:calc(11px * var(--base-scale)); 
+                      font-weight:bold; text-align:center; 
+                      padding:calc(10px * var(--base-scale)) 0; 
+                      border-bottom:1px solid rgba(255,215,0,0.1); 
+                      margin:0 calc(20px * var(--base-scale)); 
+                  }
 
-                  /* المحتوى */
-                  .content { flex:1; overflow-y:auto; max-height:300px; padding-bottom:5px; }
-                  .section-title { color:var(--yellow); font-size:10px; font-weight:bold; text-align:center; padding:10px 0 5px; border-bottom:1px solid rgba(255,215,0,0.1); margin:0 15px; }
-                  .item-row { display:flex; justify-content:space-between; align-items:center; padding:8px 18px; cursor:pointer; }
-                  .item-name { font-size:11px; font-weight:bold; }
-                  .toggle { background:var(--yellow); color:#000; padding:2px 8px; font-size:9px; font-weight:900; border-radius:2px; min-width:30px; text-align:center; }
+                  .item-row { 
+                      display:flex; justify-content:space-between; align-items:center; 
+                      padding:calc(10px * var(--base-scale)) calc(15px * var(--base-scale)); 
+                      font-size:calc(12px * var(--base-scale));
+                  }
+
+                  .toggle { 
+                      background:var(--yellow); color:#000; 
+                      padding:calc(3px * var(--base-scale)) calc(10px * var(--base-scale)); 
+                      font-size:calc(10px * var(--base-scale)); 
+                      font-weight:900; border-radius:4px; min-width:calc(35px * var(--base-scale)); text-align:center; 
+                  }
                   .off { background:var(--red); color:#fff; }
 
-                  /* السلايدرات (في الإعدادات) */
-                  .slider-row { padding:6px 18px; }
-                  .slider-label { display:flex; justify-content:space-between; font-size:10px; color:#aaa; margin-bottom:4px; }
-                  input[type=range] { -webkit-appearance:none; width:100%; height:2px; background:#333; outline:none; }
-                  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; background:var(--yellow); border-radius:50%; cursor:pointer; }
+                  .footer { 
+                      padding:calc(10px * var(--base-scale)); 
+                      text-align:center; border-top:1px solid var(--yellow); 
+                      background:rgba(0,0,0,0.3); position: relative;
+                  }
 
-                  .footer { padding:8px; border-top:1px solid var(--yellow); background:#000; text-align:center; position:relative; }
-                  .resize { position:absolute; right:0; bottom:0; width:15px; height:15px; cursor:nwse-resize; background:linear-gradient(135deg, transparent 50%, var(--yellow) 50%); }
-                  
-                  /* الرادار ESP */
+                  /* مقبض التحجيم (Resize Handle) */
+                  .resize-handle {
+                      position: absolute; right: 0; bottom: 0; 
+                      width: calc(25px * var(--base-scale)); height: calc(25px * var(--base-scale)); 
+                      cursor: nwse-resize; 
+                      background: linear-gradient(135deg, transparent 50%, var(--yellow) 50%);
+                      opacity: 0.7;
+                  }
+
                   #esp-canvas { position:fixed; inset:0; pointer-events:none; z-index:2; }
               </style>
           </head>
@@ -104,49 +135,23 @@ jobs:
 
               <div id="mod-menu" class="interactive">
                   <div class="header" id="drag">
-                      <span style="color:var(--yellow); font-weight:bold;">[-]</span>
-                      <span style="color:var(--yellow); font-size:11px; font-weight:bold;">دراكون شيتو | المطور محمد الشمري</span>
-                      <span style="font-size:8px; border:1px solid var(--yellow); padding:1px 3px;">EN</span>
+                      <span style="color:var(--yellow); font-weight:bold; cursor:pointer;" onclick="toggleCollapse()">[-]</span>
+                      <span class="header-title">دراكون شيتو | التحجيم الذكي</span>
+                      <span style="font-size:8px; border:1px solid var(--yellow); padding:1px 3px;">PRO</span>
                   </div>
 
-                  <div class="sub-card">
-                      <div class="sub-row"><span>بدء الاشتراك:</span><b>2026/03/15</b></div>
-                      <div class="sub-row"><span>نهاية الاشتراك:</span><b>2026/04/14</b></div>
-                      <div class="status-frames">
-                          <div class="s-frame" style="border-color:var(--yellow);"><div class="led" style="background:var(--yellow); box-shadow:none;"></div> آمن ✔</div>
-                          <div class="s-frame" style="border-color:var(--green);"><div class="led"></div> متصل</div>
-                      </div>
-                  </div>
-
-                  <div class="content" id="m-content">
-                      <div id="p-main">
-                          <div class="section-title">الرادار (ESP)</div>
-                          <div class="item-row" onclick="tgl('radar', this)"><span>تفعيل الرادار</span><span class="toggle">ON</span></div>
-                          <div class="item-row" onclick="tgl('box', this)"><span>صندوق 3D مربع</span><span class="toggle">ON</span></div>
-                          <div class="section-title">التفعيلات (MODS)</div>
-                          <div class="item-row" onclick="tgl('aim', this)"><span>ايمبوت (Aimbot)</span><span class="toggle off">OFF</span></div>
-                          <div class="item-row" onclick="tgl('recoil', this)"><span>ثبات السلاح</span><span class="toggle off">OFF</span></div>
-                          <div class="item-row" onclick="tgl('cheeks', this)"><span style="color:#ff85ff;">الخدود الطويلة 😊</span><span class="toggle">ON</span></div>
-                          <div style="background:rgba(255,215,0,0.1); border:1px dashed var(--yellow); margin:10px; padding:8px; text-align:center; font-size:10px; cursor:pointer;" onclick="openP('set')">⚙ إعدادات الأحجام</div>
-                      </div>
-
-                      <div id="p-set" style="display:none;">
-                          <div class="section-title">تحكم الأحجام</div>
-                          <div class="slider-row">
-                              <div class="slider-label"><span>سمك الصندوق</span><b id="v-box">1.5</b></div>
-                              <input type="range" min="1" max="5" step="0.1" value="1.5" oninput="updS('box', this.value, 'v-box')">
-                          </div>
-                          <div class="slider-row">
-                              <div class="slider-label"><span>شدة الخدود 😊</span><b id="v-cheek">1.8</b></div>
-                              <input type="range" min="1" max="10" step="0.5" value="1.8" oninput="updS('cheek', this.value, 'v-cheek')">
-                          </div>
-                          <div style="background:rgba(255,215,0,0.1); border:1px dashed var(--yellow); margin:10px; padding:8px; text-align:center; font-size:10px; cursor:pointer;" onclick="openP('main')">← عودة للمنيو</div>
-                      </div>
+                  <div id="m-body" class="content">
+                      <div class="section-title">إعدادات الرادار الملكي</div>
+                      <div class="item-row" onclick="tgl('radar', this)"><span>تفعيل الرادار</span><span class="toggle">ON</span></div>
+                      
+                      <div class="section-title">التفعيلات (MODS)</div>
+                      <div class="item-row" onclick="tgl('aim', this)"><span>ايمبوت (Aimbot)</span><span class="toggle off">OFF</span></div>
+                      <div class="item-row" onclick="tgl('recoil', this)"><span>ثبات السلاح 100%</span><span class="toggle off">OFF</span></div>
                   </div>
 
                   <div class="footer">
-                      <span style="color:#666; font-size:9px;">[♻] تحديث السيرفر</span>
-                      <div class="resize" id="resizer"></div>
+                      <span style="color:#eee; font-size:10px; font-weight:bold;">اسحب من الزاوية للتحجيم ↘</span>
+                      <div class="resize-handle" id="resizer"></div>
                   </div>
               </div>
 
@@ -158,32 +163,71 @@ jobs:
                       btn.className = state ? 'toggle' : 'toggle off';
                       window.webkit.messageHandlers.wmaster.postMessage({action:"tgl", feature:feat, state:state});
                   }
-                  function updS(feat, val, tid) {
-                      document.getElementById(tid).innerText = val;
-                      window.webkit.messageHandlers.wmaster.postMessage({action:"sld", feature:feat, value:parseFloat(val)});
-                  }
-                  function openP(p) {
-                      document.getElementById('p-main').style.display = p==='main'?'block':'none';
-                      document.getElementById('p-set').style.display = p==='set'?'block':'none';
+
+                  function toggleCollapse() {
+                      let body = document.getElementById('m-body');
+                      body.style.display = body.style.display === 'none' ? 'block' : 'none';
                   }
 
-                  // محرك رسم الرادار المحاكي
+                  // --- نظام التحجيم باليد (Resize Logic) ---
+                  const menu = document.getElementById('mod-menu');
+                  const resizer = document.getElementById('resizer');
+                  
+                  resizer.addEventListener('touchstart', (e) => {
+                      let startX = e.touches[0].clientX;
+                      let startWidth = menu.offsetWidth;
+                      
+                      function onTouchMove(e) {
+                          let newWidth = startWidth + (e.touches[0].clientX - startX);
+                          if (newWidth > 240 && newWidth < 600) {
+                              menu.style.width = newWidth + 'px';
+                              // تحديث الـ Scale بناءً على العرض (العرض الأصلي 340)
+                              let scale = newWidth / 340;
+                              document.documentElement.style.setProperty('--base-scale', scale);
+                          }
+                      }
+                      
+                      function onTouchEnd() {
+                          document.removeEventListener('touchmove', onTouchMove);
+                          document.removeEventListener('touchend', onTouchEnd);
+                      }
+                      
+                      document.addEventListener('touchmove', onTouchMove);
+                      document.addEventListener('touchend', onTouchEnd);
+                  });
+
+                  // --- نظام الرسم ESP ---
                   const cvs = document.getElementById('esp-canvas');
                   const ctx = cvs.getContext('2d');
                   cvs.width = window.innerWidth; cvs.height = window.innerHeight;
                   let enemies = [];
-                  function updateData(data) { enemies = JSON.parse(data); }
+
+                  function updateESP(data) { enemies = JSON.parse(data); }
+
                   function draw() {
                       ctx.clearRect(0,0,cvs.width,cvs.height);
                       enemies.forEach(e => {
-                          ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 1.5;
-                          // خط اللاين من الأعلى للرأس
-                          ctx.beginPath(); ctx.moveTo(cvs.width/2, 45); ctx.lineTo(e.x, e.y - e.h/2); ctx.stroke();
-                          // بوكس 3D
-                          ctx.strokeRect(e.x-e.w/2, e.y-e.h/2, e.w, e.h);
-                          ctx.strokeRect(e.x-e.w/2+10, e.y-e.h/2-10, e.w, e.h);
-                          ctx.fillStyle = "#FFD700"; ctx.font = "bold 11px Arial";
-                          ctx.fillText(e.name, e.x-e.w/2, e.y-e.h/2-15);
+                          ctx.strokeStyle = "#FFD700"; ctx.fillStyle = "#FFD700";
+                          ctx.lineWidth = 2.0;
+
+                          // 1. الاسم (الأعلى)
+                          ctx.font = "bold 13px Tahoma"; ctx.textAlign = "center";
+                          ctx.fillText(e.name + " [" + e.dist + "m]", e.x, e.y - e.h/2 - 30);
+
+                          // 2. الصندوق مربع الأضلاع
+                          ctx.strokeRect(e.x - e.w/2, e.y - e.h/2, e.w, e.h);
+
+                          // 3. الصحة (عريضة بالأسفل)
+                          ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(e.x - e.w/2, e.y + e.h/2 + 5, e.w, 8);
+                          ctx.fillStyle = "#39ff14"; ctx.fillRect(e.x - e.w/2, e.y + e.h/2 + 5, e.w * (e.hp/100), 8);
+
+                          // 4. السلاح
+                          ctx.fillStyle = "#fff"; ctx.font = "bold 10px Tahoma";
+                          ctx.fillText(e.weapon, e.x, e.y + e.h/2 + 25);
+                          
+                          // خط اللاين من تحت كلمة الاعداء
+                          ctx.strokeStyle = "#FFD700"; ctx.beginPath();
+                          ctx.moveTo(cvs.width/2, 45); ctx.lineTo(e.x, e.y - e.h/2); ctx.stroke();
                       });
                       requestAnimationFrame(draw);
                   }
@@ -203,36 +247,37 @@ jobs:
           @implementation DragonMenu
           - (void)viewDidLoad {
               [super viewDidLoad];
+              
+              // جعل الخلفية شفافة تماماً في نظام iOS
               self.view.backgroundColor = [UIColor clearColor];
+              
               WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
               [config.userContentController addScriptMessageHandler:self name:@"wmaster"];
+              
               self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds configuration:config];
               self.webView.backgroundColor = [UIColor clearColor];
-              self.webView.opaque = NO;
+              self.webView.opaque = NO; // مهم جداً للشفافية
+              self.webView.scrollView.backgroundColor = [UIColor clearColor];
+              
               [self.view addSubview:self.webView];
               [self.webView loadHTMLString:[NSString stringWithUTF8String:HTML_UI] baseURL:nil];
+              
               dispatch_async(dispatch_get_global_queue(0, 0), ^{ [self MainLoop]; });
           }
 
           - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
               NSDictionary *dict = message.body;
-              NSString *action = dict[@"action"];
-              if ([action isEqualToString:@"tgl"]) {
-                  NSString *f = dict[@"feature"];
-                  bool s = [dict[@"state"] boolValue];
-                  if([f isEqualToString:@"cheeks"]) Config.longCheeks = s;
-                  if([f isEqualToString:@"aim"]) Config.aimbot = s;
-              } else if ([action isEqualToString:@"sld"]) {
-                  if([dict[@"feature"] isEqualToString:@"cheek"]) Config.cheekIntensity = [dict[@"value"] floatValue];
-              }
+              NSString *feat = dict[@"feature"];
+              bool state = [dict[@"state"] boolValue];
+              if([feat isEqualToString:@"radar"]) Config.radar = state;
+              if([feat isEqualToString:@"aim"]) Config.aimbot = state;
           }
 
           - (void)MainLoop {
               while(true) {
-                  // هنا يتم استخراج إحداثيات اللاعبين الحقيقية وإرسالها للـ UI
-                  NSString *json = @"[{\"name\":\"بـوت_الشـمري\",\"x\":450,\"y\":250,\"w\":70,\"h\":140}]";
+                  NSString *json = @"[{\"name\":\"بـوت_الشـمري\",\"dist\":\"120\",\"x\":500,\"y\":300,\"w\":80,\"h\":160,\"hp\":85,\"weapon\":\"M416 🔫\"}]";
                   dispatch_async(dispatch_get_main_queue(), ^{
-                      [self.webView evaluateJavaScript:[NSString stringWithFormat:@"updateData('%@')", json] completionHandler:nil];
+                      [self.webView evaluateJavaScript:[NSString stringWithFormat:@"updateESP('%@')", json] completionHandler:nil];
                   });
                   usleep(16666); 
               }
@@ -249,17 +294,15 @@ jobs:
           }
           EOF_MM
 
-      - name: 🔥 صهر المحرك (Compilation)
+      - name: 🔥 صهر المنظومة إلى Dylib
         run: |
-          echo "جاري صهر الكود إلى Dylib..."
           xcrun -sdk iphoneos clang++ -arch arm64 -shared -std=c++17 -fPIC -framework Foundation -framework UIKit -framework WebKit engine.mm -o DragonCheeto.dylib
-          echo "تم الصهر بنجاح! ✅"
 
       - name: 🔏 توقيع ملف الدايلب (ldid)
         run: ldid -S DragonCheeto.dylib
 
-      - name: 🚀 تصدير ملف الحماية الملكي
+      - name: 🚀 تصدير الملف النهائي
         uses: actions/upload-artifact@v4
         with:
-          name: 🐲 Dragon_Cheeto_Dylib
+          name: 🐲 Resizable_Transparent_Dylib
           path: DragonCheeto.dylib
