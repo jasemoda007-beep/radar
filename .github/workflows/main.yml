@@ -1,21 +1,43 @@
-name: Build Wessam Mod
-on: [push]
+name: Build Wessam Pro Mod
+
+on: [push, workflow_dispatch]
+
 jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # --- [ الخطوة السحرية: جلب ImGui تلقائياً ] ---
+      - name: Fetch ImGui Library
+        run: |
+          mkdir -p ImGui
+          git clone --depth 1 https://github.com/ocornut/imgui.git temp_imgui
+          # نسخ الملفات الأساسية
+          cp temp_imgui/*.cpp ImGui/
+          cp temp_imgui/*.h ImGui/
+          # نسخ ملفات الـ Backends للأيفون (Metal & iOS)
+          cp temp_imgui/backends/imgui_impl_metal.* ImGui/
+          cp temp_imgui/backends/imgui_impl_ios.* ImGui/
+          rm -rf temp_imgui
+          echo "✅ ImGui files are ready for building!"
+
       - name: Setup Theos
         run: |
-          git clone --recursive https://github.com/theos/theos.git ~/theos
-          git clone https://github.com/Theos-SDKS/iOS-SDKs.git ~/theos/sdks
-      - name: Build
+          sudo xcode-select -s /Applications/Xcode.app
+          export THEOS=~/theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
+          git clone https://github.com/Theos-SDKS/iOS-SDKs.git $THEOS/sdks
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+
+      - name: Build Dylib
         run: |
           export THEOS=~/theos
           make package FINALPACKAGE=1
-      - name: Upload
+          
+      - name: Upload Build
         uses: actions/upload-artifact@v3
         with:
-          name: Pro-Dylib
+          name: Wessam-Pro-Build
           path: packages/*.deb
-          
