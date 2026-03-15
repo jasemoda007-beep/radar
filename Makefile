@@ -1,15 +1,12 @@
 # اسم المود
 TWEAK_NAME = WessamMod
 
-# الملفات المراد جمعها (Tweak + ملفات مكتبة ImGui)
-WessamMod_FILES = Tweak.xm $(wildcard ImGui/*.cpp) $(wildcard ImGui/backends/*.mm)
+# إخبار المترجم أين يجد ملفات ImGui التي جلبها GitHub
+WessamMod_FILES = Tweak.xm $(wildcard ImGui/*.cpp) $(wildcard ImGui/*.mm)
+WessamMod_CFLAGS = -fobjc-arc -IImGui
 
-# مكتبات النظام الضرورية للرسم واللمس
-WessamMod_FRAMEWORKS = UIKit Foundation Metal MetalKit QuartzCore CoreGraphics
-
-# إعدادات المعالج والأمان
-ARCHS = arm64 arm64e
-TARGET = iphone:clang:latest:14.0
+# المكتبات الرسمية
+WessamMod_FRAMEWORKS = UIKit Foundation Metal MetalKit QuartzCore
 
 include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/tweak.mk
