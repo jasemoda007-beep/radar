@@ -7,34 +7,54 @@
 #import "ImGui/imgui.h"
 #import "ImGui/imgui_impl_metal.h"
 
-// --- [ 1. بنك الأوفستات (أحمد) ] ---
-namespace AhmedOffsets {
-    uintptr_t UWorld = 0x106684010;
-    uintptr_t GNames = 0x104C0F1E8;
-    uintptr_t Engine = 0x10A4A0768;
-    uintptr_t BonePos = 0x1031DEDEC;
-    uintptr_t ProjectWorldLocationToScreen = 0x105EFB82C;
-    int Health = 0xdb8;
-    int Recoil = 0xc50;
+// --- [ 1. بنك البيانات والأوفستات الكامل ] ---
+namespace Global {
+    uintptr_t GWorld = 0x10A4A1960;
+    uintptr_t GNames = 0x10A0557E0;
+    uintptr_t GObject = 0x10A288B80;
+    uintptr_t W2S = 0x105EFB82C;
 }
 
-// --- [ 2. متغيرات التحكم والظهور ] ---
-enum ModState { LOGIN, LOADING, SUCCESS_CARD, MAIN_MENU };
+namespace Offsets {
+    int ULevel = 0x30;
+    int ActorArray = 0xA0;
+    int ActorCount = 0xA8;
+    int Health = 0xdb8;
+    int Team = 0x938;
+    int Mesh = 0x4a8;
+    int Robot = 0x9d0;
+    int Recoil = 0xc50;
+    int WeaponOne = 0x29f0;
+}
+
+// --- [ 2. حالات المود والاشتراك ] ---
+enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
 ModState g_State = LOGIN;
-bool showMenu = true; // مفتاح إظهار وإخفاء المنيو
+bool showMenu = true;
+NSArray *g_OnlineBypass = nil; // تخزين حماية الـ JSON
 
 struct UserSub {
     NSString *key;
-    NSString *type;
-    NSString *endDate;
+    NSString *type; // يومي، أسبوعي، شهري
+    NSString *start;
+    NSString *end;
+    bool isActive;
 } g_User;
 
-bool radarBox = true, radarHealth = true, aimbot = false, noRecoil = false;
+// خيارات التحكم
+bool radarBox = true, aimbot = false, noRecoil = false;
 
-// --- [ 3. محرك الذاكرة ] ---
-uintptr_t get_base() { return (uintptr_t)_dyld_get_image_header(0); }
+// --- [ 3. محرك الذاكرة والشبكة ] ---
+uintptr_t get_base(const char* module) {
+    if(!module) return (uintptr_t)_dyld_get_image_header(0);
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; i++) {
+        if (strstr(_dyld_get_image_name(i), module)) return (uintptr_t)_dyld_get_image_header(i);
+    }
+    return 0;
+}
 
-void patch_hex(uintptr_t addr, NSString *hex) {
+void patch_memory(uintptr_t addr, NSString *hex) {
     if (!addr) return;
     hex = [hex stringByReplacingOccurrencesOfString:@" " withString:@""];
     NSMutableData *data = [NSMutableData data];
@@ -48,109 +68,134 @@ void patch_hex(uintptr_t addr, NSString *hex) {
     vm_protect(mach_task_self(), (vm_address_t)addr, data.length, FALSE, VM_PROT_READ | VM_PROT_EXECUTE);
 }
 
-// --- [ 4. نظام اللمس والنقر بـ 3 أصابع ] ---
-%hook UIWindow
-- (void)sendEvent:(UIEvent *)event {
-    %orig;
-
-    // الحصول على بيانات اللمس لـ ImGui
-    ImGuiIO& io = ImGui::GetIO();
-    UITouch *touch = [[event allTouches] anyObject];
-    CGPoint location = [touch locationInView:self];
-
-    // إرسال الإحداثيات لـ ImGui ليتحرك المنيو مع الإصبع
-    io.MousePos = ImVec2(location.x, location.y);
-    
-    if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
-    if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
-
-    // كشف النقر بـ 3 أصابع لإظهار/إخفاء المنيو
-    if ([[event allTouches] count] == 3) {
-        if (touch.phase == UITouchPhaseBegan) {
-            showMenu = !showMenu;
+// جلب وحقن الحماية من ملف الـ JSON
+void inject_online_protection() {
+    NSURL *url = [NSURL URLWithString:@"http://34.204.178.160/manager/offsets.json"];
+    NSData *data = [NSData dataWithContentsOfURL:url];
+    if (data) {
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        g_OnlineBypass = json[@"protection"];
+        for (NSDictionary *item in g_OnlineBypass) {
+            uintptr_t moduleBase = get_base([item[@"module"] UTF8String]);
+            uintptr_t offset = (uintptr_t)strtoull([item[@"offset"] UTF8String], NULL, 16);
+            patch_memory(moduleBase + offset, item[@"patch"]);
         }
     }
 }
-%end
 
-// --- [ 5. واجهات المود ] ---
+// عملية الدخول الاحترافية
 void login_process(NSString *key) {
-    g_State = LOADING;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    g_State = ACTIVATING;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        // هنا يتم فحص الـ API.php
         g_User.key = key;
-        g_User.type = @"VIP LIFETIME";
-        g_User.endDate = @"2027-01-01";
+        g_User.type = @"اشتراك شهري (VIP)";
+        g_User.start = @"2026-03-16";
+        g_User.end = @"2026-04-16";
+        
+        inject_online_protection(); // حقن الحماية فور النجاح
         g_State = SUCCESS_CARD;
     });
 }
 
-void ShowMainMenu() {
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("🛰️ WESSAM CYBER V17", &showMenu)) {
-        if (ImGui::BeginTabBar("Tabs")) {
-            if (ImGui::BeginTabItem("👁️ الرادار")) {
-                ImGui::Checkbox("إظهار الصناديق", &radarBox);
-                ImGui::Checkbox("عرض الصحة", &radarHealth);
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("🎯 القتال")) {
-                ImGui::Checkbox("أيم بوت", &aimbot);
-                if (ImGui::Checkbox("ثبات سلاح (No Recoil)", &noRecoil)) {
-                    patch_hex(get_base() + AhmedOffsets::Recoil, noRecoil ? @"00 00 00 00" : @"00 00 A0 41");
-                }
-                ImGui::EndTabItem();
-            }
-            ImGui::EndTabBar();
-        }
+// --- [ 4. الواجهات الرسومية ] ---
+
+void ShowLoginUI() {
+    ImGui::Begin("🛰️ WESSAM PRO - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
+    if (g_State == LOGIN) {
+        static char k[64] = "";
+        ImGui::Text("أدخل مفتاح التفعيل:");
+        ImGui::InputText("##key", k, 64);
+        if (ImGui::Button("تفعيل الاشتراك 🚀", ImVec2(-1, 45))) login_process([NSString stringWithUTF8String:k]);
+    } else {
+        ImGui::Indent(120);
+        ImGui::TextColored(ImVec4(1,1,0,1), "جاري فحص الحماية...");
+        ImGui::Text("جاري الاتصال بالسيرفر...");
+        // انيميشن بسيط (يمكن إضافة دائرة تحميل هنا)
     }
     ImGui::End();
 }
 
-// --- [ 6. محرك الرسم المعدل ] ---
+void ShowSuccessCard() {
+    ImGui::Begin("✅ تم التفعيل بنجاح", &showMenu, ImGuiWindowFlags_NoCollapse);
+    ImGui::TextColored(ImVec4(0,1,0,1), "مرحباً بك في عالم الاحتراف!");
+    ImGui::Separator();
+    
+    ImGui::BeginChild("Info", ImVec2(0, 120), true);
+    ImGui::Text("المفتاح: %s", [g_User.key UTF8String]);
+    ImGui::Text("نوع الاشتراك: %s", [g_User.type UTF8String]);
+    ImGui::Text("تاريخ البدء: %s", [g_User.start UTF8String]);
+    ImGui::Text("تاريخ الانتهاء: %s", [g_User.end UTF8String]);
+    ImGui::EndChild();
+
+    if (ImGui::Button("دخول للقائمة الرئيسية 🎮", ImVec2(-1, 45))) g_State = MAIN_MENU;
+    ImGui::End();
+}
+
+void ShowMainMenu() {
+    ImGui::Begin("🛰️ WESSAM CYBER CENTER V21");
+    if (ImGui::BeginTabBar("Tabs")) {
+        if (ImGui::BeginTabItem("👁️ رادار")) {
+            ImGui::Checkbox("تفعيل صناديق ESP", &radarBox);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("🎯 قتال")) {
+            ImGui::Checkbox("أيم بوت (Magic)", &aimbot);
+            if (ImGui::Checkbox("ثبات سلاح (No Recoil)", &noRecoil)) {
+                patch_memory(get_base(NULL) + Offsets::Recoil, noRecoil ? @"00 00 00 00" : @"00 00 A0 41");
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("🛡️ حماية أونلاين")) {
+            ImGui::Text("الحماية المحقونة من السيرفر:");
+            for (NSDictionary *item in g_OnlineBypass) {
+                ImGui::BulletText("%s", [item[@"name"] UTF8String]);
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+    ImGui::End();
+}
+
+// --- [ 5. محرك اللمس والرسم ] ---
+%hook UIWindow
+- (void)sendEvent:(UIEvent *)event {
+    %orig;
+    ImGuiIO& io = ImGui::GetIO();
+    UITouch *touch = [[event allTouches] anyObject];
+    CGPoint loc = [touch locationInView:self];
+    io.MousePos = ImVec2(loc.x, loc.y);
+    if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
+    if (touch.phase == UITouchPhaseEnded) io.MouseDown[0] = false;
+    if ([[event allTouches] count] == 3 && touch.phase == UITouchPhaseBegan) showMenu = !showMenu;
+}
+%end
+
 %hook MTKView
 - (void)drawRect:(CGRect)rect {
     %orig;
+    if (!showMenu) return;
+    MTLRenderPassDescriptor *desc = self.currentRenderPassDescriptor;
+    if (!desc) return;
 
-    if (!showMenu) return; // لا ترسم المنيو إذا كان مخفياً
+    static id<MTLCommandQueue> queue = nil;
+    if (!queue) { queue = [self.device newCommandQueue]; ImGui_ImplMetal_Init(self.device); }
 
-    MTLRenderPassDescriptor *descriptor = self.currentRenderPassDescriptor;
-    if (!descriptor) return;
-
-    static id<MTLCommandQueue> commandQueue = nil;
-    if (!commandQueue) commandQueue = [self.device newCommandQueue];
-
-    id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-
-    static BOOL setup = NO;
-    if (!setup) {
-        ImGui_ImplMetal_Init(self.device);
-        setup = YES;
-    }
-
-    ImGui_ImplMetal_NewFrame(descriptor);
+    ImGui::GetIO().DisplaySize = ImVec2(rect.size.width, rect.size.height);
+    id<MTLCommandBuffer> buffer = [queue commandBuffer];
+    ImGui_ImplMetal_NewFrame(desc);
     ImGui::NewFrame();
 
-    if (g_State == LOGIN) {
-        ImGui::Begin("LOGIN", &showMenu);
-        static char k[64] = "";
-        ImGui::InputText("Key", k, 64);
-        if (ImGui::Button("ACTIVATE", ImVec2(-1, 0))) login_process([NSString stringWithUTF8String:k]);
-        ImGui::End();
-    } else if (g_State == SUCCESS_CARD) {
-        ImGui::Begin("SUCCESS", &showMenu);
-        ImGui::Text("Welcome Eng. Masoud!");
-        if (ImGui::Button("START MOD", ImVec2(-1, 0))) g_State = MAIN_MENU;
-        ImGui::End();
-    } else if (g_State == MAIN_MENU) {
-        ShowMainMenu();
-    }
+    if (g_State == LOGIN || g_State == ACTIVATING) ShowLoginUI();
+    else if (g_State == SUCCESS_CARD) ShowSuccessCard();
+    else if (g_State == MAIN_MENU) ShowMainMenu();
 
     ImGui::Render();
-    id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:descriptor];
-    ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, renderEncoder);
-    [renderEncoder endEncoding];
-
-    [commandBuffer presentDrawable:self.currentDrawable];
-    [commandBuffer commit];
+    id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
+    ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), buffer, encoder);
+    [encoder endEncoding];
+    [buffer presentDrawable:self.currentDrawable];
+    [buffer commit];
 }
 %end
