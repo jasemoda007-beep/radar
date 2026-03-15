@@ -20,9 +20,6 @@ jobs:
           echo "✅ ImGui Metal backend is ready!"
 
       - name: Setup Theos
-        # هذا المتغير يمنع جيت هوب من طلب اسم المستخدم والباسورد
-        env:
-          GIT_TERMINAL_PROMPT: 0
         run: |
           sudo xcode-select -s /Applications/Xcode.app
           export THEOS=~/theos
@@ -30,17 +27,21 @@ jobs:
           # تحميل Theos الأساسي
           git clone --recursive --depth 1 https://github.com/theos/theos.git $THEOS
           
-          # تنظيف مجلد الـ SDKs تماماً
-          rm -rf $THEOS/sdks
-          # تحميل الـ SDKs من مصدر (Mirror) فائق الاستقرار ومخصص لجيت هوب أكشنز
-          git clone --depth 1 https://github.com/Theos-SDKS/iOS-SDKs.git $THEOS/sdks
+          # تحميل الـ SDKs كملف ZIP لتجنب مشكلة اليوزر نيم
+          mkdir -p $THEOS/sdks
+          curl -L https://github.com/theos/sdks/archive/master.zip -o sdks.zip
+          unzip -q sdks.zip -d $THEOS/sdks
+          
+          # ترتيب الملفات في مكانها الصحيح
+          mv $THEOS/sdks/sdks-master/* $THEOS/sdks/
+          rm -rf $THEOS/sdks/sdks-master sdks.zip
           
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Build Dylib
         run: |
           export THEOS=~/theos
-          # تنفيذ بناء ملف الـ dylib
+          # بناء المشروع
           make package FINALPACKAGE=1
           
       - name: Upload Build
