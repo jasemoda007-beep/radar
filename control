@@ -1,1 +1,9 @@
 
+Package: com.wessam.cybermod
+Name: Wessam Pro Mod
+Depends: mobilesubstrate
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Professional ESP & Radar for PUBG (Non-Jailbreak)
+Author: Eng. Wessam
+Section: Tweaks
