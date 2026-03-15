@@ -1,301 +1,206 @@
-name: 🐲 DRAGON HACK - ORIGINAL CHEETO (iOS)
+name: 🐲 DRAGON HACK - FULL SYSTEM (IOS DYLIB)
 
 on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch: 
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-  build_dragon:
-    name: صهر محرك الشيتو (محمد الشمري)
+  build_dragon_final:
+    name: 🛠️ صهر محرك الشيتو (محمد الشمري)
     runs-on: macos-latest
 
     steps:
       - name: 📥 جلب المستودع
         uses: actions/checkout@v4
 
-      # ========================================================
-      # 1. التوليد البرمجي (Objective-C++ & WebKit)
-      # ========================================================
-      - name: 📝 توليد محرك دراكون (wsam.mm)
+      - name: ⚙️ تجهيز أدوات بناء الآيفون
+        run: brew install ldid
+
+      - name: 📝 توليد محرك المنظومة (engine.mm)
         run: |
-          cat << 'EOF' > wsam.mm
-          #define _DARWIN_C_SOURCE 
+          cat << 'EOF_MM' > engine.mm
           #import <Foundation/Foundation.h>
           #import <UIKit/UIKit.h>
           #import <WebKit/WebKit.h>
           #include <iostream>
-          #include <string>
-          #include <dlfcn.h>
+          #include <vector>
+          #include <cmath>
+          #include <thread>
           #include <unistd.h>
-          #include "json.hpp" // [شرح]: مكتبة معالجة بيانات السيرفر
 
-          using json = nlohmann::json;
           using namespace std;
 
           // ==========================================================
-          // 1. [إعدادات السيرفر والتحقق] 🌐
-          // [شرح]: رابط لوحتك للتحقق من الكود وجلب أوامر الشادو
+          // 1. [إعدادات التفعيلات والسلايدرات]
           // ==========================================================
-          const string SERVER_URL = "http://34.204.178.160/panel.php?api=check";
-          bool g_IsLoggedIn = false; // [شرح]: حالة تسجيل الدخول، إذا false اللعبة مجمدة
-          bool g_IsServerFrozen = false; // [شرح]: إذا true يظهر شاشة صيانة سوداء
+          struct HackConfig {
+              bool radar = true;
+              bool aimbot = false;
+              bool norecoil = false;
+              bool longCheeks = true; // ميزتك المفضلة 😊
+              
+              // قيم السلايدرات
+              float boxThick = 1.5f;
+              float lineThick = 1.5f;
+              float infoSize = 11.0f;
+              float cheekIntensity = 1.8f; 
+          } Config;
 
           // ==========================================================
-          // 2. [محرك الشادو أونلاين - Online Shadow Injector] 👻
-          // [شرح]: دالة لتحميل وحقن وحذف مكتبة الشادو من السيرفر
-          // ==========================================================
-          void DownloadAndInjectShadow(string dylib_url) {
-              if (dylib_url.empty()) return;
-              @autoreleasepool {
-                  NSLog(@"[W-MASTER] جاري تحميل ملف الحماية الخفي...");
-                  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:dylib_url.c_str()]];
-                  NSData *data = [NSData dataWithContentsOfURL:url];
-                  
-                  if (data) {
-                      NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"shadow.dylib"];
-                      [data writeToFile:path atomically:YES];
-                      
-                      void* handle = dlopen([path UTF8String], RTLD_NOW);
-                      if (handle) {
-                          NSLog(@"[W-MASTER] ✅ تم حقن الشادو بنجاح!");
-                          unlink([path UTF8String]); // [شرح]: حذف الملف فوراً بعد الحقن
-                      }
-                  }
-              }
-          }
-
-          // ==========================================================
-          // 3. [دالة الاتصال بالسيرفر والتحقق] 📡
-          // [شرح]: ترسل الكود والـ HWID للسيرفر وتستقبل الرد
-          // ==========================================================
-          string SyncWithServer(string key) {
-              string result = "{\"status\":\"error\", \"msg\":\"Connection Failed\"}";
-              @autoreleasepool {
-                  // [شرح]: الحصول على معرف الجهاز الفريد (HWID) لربط الكود بالجهاز
-                  NSString *hwid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
-                  NSString *urlStr = [NSString stringWithFormat:@"%s&key=%s&hwid=%@", SERVER_URL.c_str(), key.c_str(), hwid];
-                  
-                  NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:urlStr]];
-                  if(data) {
-                      result = string((char*)[data bytes], [data length]);
-                      try {
-                          auto res = json::parse(result);
-                          if(res["server_state"] == "danger") {
-                              g_IsServerFrozen = true;
-                          } else if(res["status"] == "success") {
-                              g_IsLoggedIn = true;
-                              if (res.contains("shadow_lib")) {
-                                  DownloadAndInjectShadow(res["shadow_lib"].get<string>());
-                              }
-                          }
-                      } catch (...) {}
-                  }
-              }
-              return result;
-          }
-
-          // ==========================================================
-          // 4. [واجهة الويب الملكية - HTML/CSS/JS] 🎨
-          // [شرح]: تصميم الشيتو الأصلي (طبق الأصل من الصورة)
+          // 2. [واجهة الويب الملكية - HTML/CSS/JS]
           // ==========================================================
           const char* HTML_UI = R"HTML(
           <!DOCTYPE html>
-          <html lang="en">
+          <html lang="ar" dir="rtl">
           <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-              <title>CHEETO UI</title>
               <style>
-                  /* الألوان الأصلية للشيتو */
-                  :root { --yellow: #FFD700; --bg-dark: #000000; --bg-panel: #111111; --green: #00FF00; --red: #FF0000; }
-                  body { margin: 0; padding: 0; font-family: 'Arial', sans-serif; background: transparent; height: 100vh; overflow: hidden; color: #fff; pointer-events: none; user-select: none; }
+                  :root { --yellow: #FFD700; --bg: rgba(5,5,5,0.98); --red: #ff2a2a; --green: #39ff14; }
+                  body { margin:0; padding:0; background:transparent; font-family:Tahoma; color:#fff; user-select:none; overflow:hidden; }
                   .interactive { pointer-events: auto; }
-
-                  /* ================= 1. شاشة التجميد (صيانة) ================= */
-                  #freeze-screen { position: fixed; inset: 0; background: #000; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; }
-                  .freeze-box { border: 2px solid var(--red); padding: 30px; text-align: center; background: #111; }
-
-                  /* ================= 2. شاشة اللوكن (طبق الأصل من الصورة) ================= */
-                  /* [شرح]: خلفية سوداء شفافة تجمد اللعبة بالكامل */
-                  #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 5000; display: flex; align-items: center; justify-content: center; }
-                  .login-box { background: var(--bg-dark); padding: 30px; border: 2px solid var(--yellow); width: 300px; text-align: center; }
-                  .login-title { font-size: 24px; font-weight: bold; color: var(--yellow); margin-bottom: 25px; text-transform: uppercase; }
-                  .key-input { width: 100%; padding: 15px; background: #222; border: 1px solid var(--yellow); color: var(--yellow); font-family: monospace; font-size: 18px; text-align: center; box-sizing: border-box; margin-bottom: 20px; outline: none; }
-                  .login-btn { width: 100%; padding: 15px; background: var(--yellow); color: #000; border: none; font-weight: bold; font-size: 18px; cursor: pointer; text-transform: uppercase; }
-                  .login-btn:active { background: #E6C200; }
-                  .loader { border: 4px solid #333; border-top: 4px solid var(--yellow); border-radius: 50%; width: 25px; height: 25px; animation: spin 0.8s linear infinite; display: none; margin: 0 auto; }
-                  @keyframes spin { 100% { transform: rotate(360deg); } }
-
-                  /* ================= 3. رادار الشيتو الأصلي (طبق الأصل) ================= */
-                  #cheeto-radar { position: fixed; inset: 0; z-index: 50; display: none; pointer-events: none; }
-                  /* خط اللاين الأصفر */
-                  .snapline { position: absolute; top: 0; left: 50%; width: 2px; height: 40%; background: var(--yellow); transform-origin: top; transform: rotate(15deg); }
-                  /* صندوق اللاعب والاسم الكبير */
-                  .player-box { position: absolute; top: 40%; left: 38%; width: 80px; height: 160px; border: 2px solid var(--yellow); display: flex; flex-direction: column; align-items: center; }
-                  .player-name { position: absolute; top: -30px; color: var(--yellow); font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px #000; white-space: nowrap; }
-                  /* شريط الصحة العريض */
-                  .player-hp-bar { position: absolute; bottom: -15px; left: 0; width: 100%; height: 8px; background: #333; border: 1px solid #000; }
-                  .player-hp-fill { width: 85%; height: 100%; background: var(--green); }
-
-                  /* ================= 4. المنيو الإمبراطوري (ثابت، بدون سكرول) ================= */
-                  #main-menu { position: fixed; top: 100px; left: 20px; width: 320px; background: rgba(0,0,0,0.95); border: 2px solid var(--yellow); z-index: 1500; display: none; flex-direction: column; user-select: none; }
-                  .menu-header { padding: 15px; background: var(--yellow); color: #000; font-weight: bold; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
-                  .menu-content { padding: 15px; }
                   
-                  .section-title { color: var(--yellow); font-size: 14px; font-weight: bold; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid var(--yellow); }
-                  .feature-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 14px; font-weight: bold; }
+                  /* عداد الأعداء */
+                  .enemy-count { position:fixed; top:15px; left:50%; transform:translateX(-50%); color:var(--yellow); font-size:26px; font-weight:900; text-shadow:2px 2px #000; z-index:5; }
+
+                  /* المنيو الملكي */
+                  #mod-menu { position:fixed; top:60px; left:20px; width:340px; background:var(--bg); border:1.2px solid var(--yellow); border-radius:4px; box-shadow:0 0 30px #000; display:flex; flex-direction:column; z-index:100; }
+                  .header { background:#000; padding:10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--yellow); cursor:move; }
                   
-                  /* سويتشات الشيتو (مربعات صفراء) */
-                  .cheeto-switch { position: relative; display: inline-block; width: 20px; height: 20px; border: 2px solid var(--yellow); cursor: pointer; }
-                  .cheeto-switch input { opacity: 0; width: 0; height: 0; }
-                  .cheeto-switch .checkmark { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: transparent; }
-                  .cheeto-switch input:checked + .checkmark { background: var(--yellow); }
+                  /* بطاقة الاشتراك */
+                  .sub-card { background:#000; border:1px solid rgba(255,215,0,0.5); margin:8px; padding:8px; border-radius:3px; }
+                  .sub-row { display:flex; justify-content:space-between; font-size:9px; color:#888; font-weight:bold; margin-bottom:4px; }
+                  .sub-row b { color:var(--yellow); }
+                  .status-frames { display:flex; gap:6px; margin-top:4px; }
+                  .s-frame { flex:1; border:1px solid #333; padding:4px; border-radius:2px; display:flex; align-items:center; justify-content:center; gap:5px; font-size:8.5px; font-weight:900; }
+                  .led { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 5px var(--green); animation:blink 1.5s infinite; }
+                  @keyframes blink { 50% { opacity: 0.2; } }
+
+                  /* المحتوى */
+                  .content { flex:1; overflow-y:auto; max-height:300px; padding-bottom:5px; }
+                  .section-title { color:var(--yellow); font-size:10px; font-weight:bold; text-align:center; padding:10px 0 5px; border-bottom:1px solid rgba(255,215,0,0.1); margin:0 15px; }
+                  .item-row { display:flex; justify-content:space-between; align-items:center; padding:8px 18px; cursor:pointer; }
+                  .item-name { font-size:11px; font-weight:bold; }
+                  .toggle { background:var(--yellow); color:#000; padding:2px 8px; font-size:9px; font-weight:900; border-radius:2px; min-width:30px; text-align:center; }
+                  .off { background:var(--red); color:#fff; }
+
+                  /* السلايدرات (في الإعدادات) */
+                  .slider-row { padding:6px 18px; }
+                  .slider-label { display:flex; justify-content:space-between; font-size:10px; color:#aaa; margin-bottom:4px; }
+                  input[type=range] { -webkit-appearance:none; width:100%; height:2px; background:#333; outline:none; }
+                  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; background:var(--yellow); border-radius:50%; cursor:pointer; }
+
+                  .footer { padding:8px; border-top:1px solid var(--yellow); background:#000; text-align:center; position:relative; }
+                  .resize { position:absolute; right:0; bottom:0; width:15px; height:15px; cursor:nwse-resize; background:linear-gradient(135deg, transparent 50%, var(--yellow) 50%); }
+                  
+                  /* الرادار ESP */
+                  #esp-canvas { position:fixed; inset:0; pointer-events:none; z-index:2; }
               </style>
           </head>
           <body>
+              <div class="enemy-count">الاعـداء: 1</div>
+              <canvas id="esp-canvas"></canvas>
 
-              <!-- شاشة التجميد -->
-              <div id="freeze-screen" class="interactive">
-                  <div class="freeze-box">
-                      <h1 style="color:var(--red); margin:0;">SYSTEM FROZEN</h1>
-                      <p id="freezeMsg" style="color:#fff; font-size:16px;">Maintenance Mode...</p>
+              <div id="mod-menu" class="interactive">
+                  <div class="header" id="drag">
+                      <span style="color:var(--yellow); font-weight:bold;">[-]</span>
+                      <span style="color:var(--yellow); font-size:11px; font-weight:bold;">دراكون شيتو | المطور محمد الشمري</span>
+                      <span style="font-size:8px; border:1px solid var(--yellow); padding:1px 3px;">EN</span>
                   </div>
-              </div>
 
-              <!-- شاشة اللوكن (طبق الأصل) -->
-              <div id="login-overlay" class="interactive">
-                  <div class="login-box">
-                      <div class="login-title">ENTER KEY</div>
-                      <input type="text" id="keyInp" class="key-input" placeholder="XXXX-XXXX-XXXX">
-                      <button class="login-btn" id="loginBtn" onclick="processLogin()">
-                          <span id="btnText">LOGIN</span>
-                          <div class="loader" id="loader"></div>
-                      </button>
-                      <p id="msgErr" style="font-size:14px; color:var(--red); margin-top:15px; display:none; font-weight:bold;">Invalid Key!</p>
+                  <div class="sub-card">
+                      <div class="sub-row"><span>بدء الاشتراك:</span><b>2026/03/15</b></div>
+                      <div class="sub-row"><span>نهاية الاشتراك:</span><b>2026/04/14</b></div>
+                      <div class="status-frames">
+                          <div class="s-frame" style="border-color:var(--yellow);"><div class="led" style="background:var(--yellow); box-shadow:none;"></div> آمن ✔</div>
+                          <div class="s-frame" style="border-color:var(--green);"><div class="led"></div> متصل</div>
+                      </div>
                   </div>
-              </div>
 
-              <!-- رادار الشيتو الأصلي -->
-              <div id="cheeto-radar">
-                  <div class="snapline" id="line1"></div>
-                  <div class="player-box" id="box1">
-                      <div class="player-name">BOT [150m]</div>
-                      <div class="player-hp-bar"><div class="player-hp-fill"></div></div>
+                  <div class="content" id="m-content">
+                      <div id="p-main">
+                          <div class="section-title">الرادار (ESP)</div>
+                          <div class="item-row" onclick="tgl('radar', this)"><span>تفعيل الرادار</span><span class="toggle">ON</span></div>
+                          <div class="item-row" onclick="tgl('box', this)"><span>صندوق 3D مربع</span><span class="toggle">ON</span></div>
+                          <div class="section-title">التفعيلات (MODS)</div>
+                          <div class="item-row" onclick="tgl('aim', this)"><span>ايمبوت (Aimbot)</span><span class="toggle off">OFF</span></div>
+                          <div class="item-row" onclick="tgl('recoil', this)"><span>ثبات السلاح</span><span class="toggle off">OFF</span></div>
+                          <div class="item-row" onclick="tgl('cheeks', this)"><span style="color:#ff85ff;">الخدود الطويلة 😊</span><span class="toggle">ON</span></div>
+                          <div style="background:rgba(255,215,0,0.1); border:1px dashed var(--yellow); margin:10px; padding:8px; text-align:center; font-size:10px; cursor:pointer;" onclick="openP('set')">⚙ إعدادات الأحجام</div>
+                      </div>
+
+                      <div id="p-set" style="display:none;">
+                          <div class="section-title">تحكم الأحجام</div>
+                          <div class="slider-row">
+                              <div class="slider-label"><span>سمك الصندوق</span><b id="v-box">1.5</b></div>
+                              <input type="range" min="1" max="5" step="0.1" value="1.5" oninput="updS('box', this.value, 'v-box')">
+                          </div>
+                          <div class="slider-row">
+                              <div class="slider-label"><span>شدة الخدود 😊</span><b id="v-cheek">1.8</b></div>
+                              <input type="range" min="1" max="10" step="0.5" value="1.8" oninput="updS('cheek', this.value, 'v-cheek')">
+                          </div>
+                          <div style="background:rgba(255,215,0,0.1); border:1px dashed var(--yellow); margin:10px; padding:8px; text-align:center; font-size:10px; cursor:pointer;" onclick="openP('main')">← عودة للمنيو</div>
+                      </div>
                   </div>
-              </div>
 
-              <!-- المنيو الإمبراطوري (ثابت) -->
-              <div id="main-menu" class="interactive">
-                  <div class="menu-header">
-                      <span>DRAGON CHEETO</span>
-                      <span onclick="toggleMenu()" style="cursor:pointer;">[X]</span>
-                  </div>
-                  <div class="menu-content">
-                      
-                      <div class="section-title">VISUALS (ESP)</div>
-                      <div class="feature-row">
-                          <span>Enable ESP</span>
-                          <label class="cheeto-switch"><input type="checkbox" onchange="toggleRadar(this.checked)" checked><span class="checkmark"></span></label>
-                      </div>
-                      <div class="feature-row">
-                          <span>Player Box</span>
-                          <label class="cheeto-switch"><input type="checkbox" checked><span class="checkmark"></span></label>
-                      </div>
-                      <div class="feature-row">
-                          <span>Name & Health</span>
-                          <label class="cheeto-switch"><input type="checkbox" checked><span class="checkmark"></span></label>
-                      </div>
-                      <div class="feature-row">
-                          <span>Snaplines</span>
-                          <label class="cheeto-switch"><input type="checkbox" onchange="toggleLines(this.checked)" checked><span class="checkmark"></span></label>
-                      </div>
-
-                      <div class="section-title" style="margin-top:20px;">COMBAT & MISC</div>
-                      <div class="feature-row">
-                          <span>Aimbot</span>
-                          <label class="cheeto-switch"><input type="checkbox" onchange="sendCmd('aim', this.checked)"><span class="checkmark"></span></label>
-                      </div>
-                      <div class="feature-row">
-                          <span>No Recoil</span>
-                          <label class="cheeto-switch"><input type="checkbox" onchange="sendCmd('recoil', this.checked)"><span class="checkmark"></span></label>
-                      </div>
-                      <div class="feature-row">
-                          <span>iPad View</span>
-                          <label class="cheeto-switch"><input type="checkbox" onchange="sendCmd('ipad', this.checked)"><span class="checkmark"></span></label>
-                      </div>
-
+                  <div class="footer">
+                      <span style="color:#666; font-size:9px;">[♻] تحديث السيرفر</span>
+                      <div class="resize" id="resizer"></div>
                   </div>
               </div>
 
               <script>
-                  // [شرح]: لا يوجد حفظ للكود (localStorage) بناءً على طلبك
-                  
-                  function processLogin() {
-                      const btnText = document.getElementById('btnText');
-                      const loader = document.getElementById('loader');
-                      const key = document.getElementById('keyInp').value;
-                      
-                      if(key.length < 5) { document.getElementById('msgErr').style.display = 'block'; return; }
-                      
-                      btnText.style.display = 'none';
-                      loader.style.display = 'block';
-                      document.getElementById('msgErr').style.display = 'none';
-                      
-                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action:"login", key:key}));
+                  function tgl(feat, el) {
+                      let btn = el.querySelector('.toggle');
+                      let state = btn.innerText === 'ON' ? false : true;
+                      btn.innerText = state ? 'ON' : 'OFF';
+                      btn.className = state ? 'toggle' : 'toggle off';
+                      window.webkit.messageHandlers.wmaster.postMessage({action:"tgl", feature:feat, state:state});
+                  }
+                  function updS(feat, val, tid) {
+                      document.getElementById(tid).innerText = val;
+                      window.webkit.messageHandlers.wmaster.postMessage({action:"sld", feature:feat, value:parseFloat(val)});
+                  }
+                  function openP(p) {
+                      document.getElementById('p-main').style.display = p==='main'?'block':'none';
+                      document.getElementById('p-set').style.display = p==='set'?'block':'none';
                   }
 
-                  function onLoginResponse(resStr) {
-                      let res = JSON.parse(resStr);
-                      const btnText = document.getElementById('btnText');
-                      const loader = document.getElementById('loader');
-                      
-                      if (res.status === 'success') {
-                          document.getElementById('login-overlay').style.display = 'none';
-                          document.getElementById('main-menu').style.display = 'flex';
-                          toggleRadar(true);
-                      } else if (res.status === 'freeze') {
-                          document.getElementById('login-overlay').style.display = 'none';
-                          document.getElementById('main-menu').style.display = 'none';
-                          document.getElementById('freeze-screen').style.display = 'flex';
-                          document.getElementById('freezeMsg').innerText = res.msg;
-                      } else {
-                          btnText.style.display = 'block';
-                          loader.style.display = 'none';
-                          document.getElementById('msgErr').style.display = 'block';
-                          document.getElementById('msgErr').innerText = res.msg || 'Invalid Key!';
-                      }
+                  // محرك رسم الرادار المحاكي
+                  const cvs = document.getElementById('esp-canvas');
+                  const ctx = cvs.getContext('2d');
+                  cvs.width = window.innerWidth; cvs.height = window.innerHeight;
+                  let enemies = [];
+                  function updateData(data) { enemies = JSON.parse(data); }
+                  function draw() {
+                      ctx.clearRect(0,0,cvs.width,cvs.height);
+                      enemies.forEach(e => {
+                          ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 1.5;
+                          // خط اللاين من الأعلى للرأس
+                          ctx.beginPath(); ctx.moveTo(cvs.width/2, 45); ctx.lineTo(e.x, e.y - e.h/2); ctx.stroke();
+                          // بوكس 3D
+                          ctx.strokeRect(e.x-e.w/2, e.y-e.h/2, e.w, e.h);
+                          ctx.strokeRect(e.x-e.w/2+10, e.y-e.h/2-10, e.w, e.h);
+                          ctx.fillStyle = "#FFD700"; ctx.font = "bold 11px Arial";
+                          ctx.fillText(e.name, e.x-e.w/2, e.y-e.h/2-15);
+                      });
+                      requestAnimationFrame(draw);
                   }
-
-                  function sendCmd(feat, state) {
-                      window.webkit.messageHandlers.wmaster.postMessage(JSON.stringify({action:"toggle", feature:feat, state:state}));
-                  }
-
-                  function toggleRadar(state) { document.getElementById('cheeto-radar').style.display = state ? 'block' : 'none'; }
-                  function toggleLines(state) { document.getElementById('line1').style.display = state ? 'block' : 'none'; }
-                  function toggleMenu() { let m = document.getElementById('main-menu'); m.style.display = m.style.display==='none'?'flex':'none'; }
-                  
-                  // فتح المنيو بـ 3 أصابع
-                  document.addEventListener('touchstart', e => { 
-                      if(e.touches.length === 3 && !e.target.closest('.interactive')) { toggleMenu(); }
-                  });
+                  draw();
               </script>
           </body>
           </html>
           )HTML";
 
           // ==========================================================
-          // 5. [جسر الـ WebView والـ HitTest السحري] ⚙️
-          // [شرح]: يمنع اللمس عن اللعبة إذا لم يتم تسجيل الدخول
+          // 3. [جسر الربط والمحرك - Objective-C++]
           // ==========================================================
-          @interface WMasterMenu : UIViewController <WKScriptMessageHandler>
+          @interface DragonMenu : UIViewController <WKScriptMessageHandler>
           @property (nonatomic, strong) WKWebView *webView;
           @end
 
-          @implementation WMasterMenu
+          @implementation DragonMenu
           - (void)viewDidLoad {
               [super viewDidLoad];
               self.view.backgroundColor = [UIColor clearColor];
@@ -304,98 +209,57 @@ jobs:
               self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds configuration:config];
               self.webView.backgroundColor = [UIColor clearColor];
               self.webView.opaque = NO;
-              self.webView.scrollView.bounces = NO;
-              self.webView.scrollView.backgroundColor = [UIColor clearColor];
               [self.view addSubview:self.webView];
               [self.webView loadHTMLString:[NSString stringWithUTF8String:HTML_UI] baseURL:nil];
+              dispatch_async(dispatch_get_global_queue(0, 0), ^{ [self MainLoop]; });
           }
 
           - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
-              NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:[message.body dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+              NSDictionary *dict = message.body;
               NSString *action = dict[@"action"];
-              if ([action isEqualToString:@"login"]) {
-                  NSString *key = dict[@"key"];
-                  dispatch_async(dispatch_get_global_queue(0, 0), ^{
-                      string res = SyncWithServer(string([key UTF8String]));
-                      dispatch_async(dispatch_get_main_queue(), ^{
-                          NSString *jsCode = [NSString stringWithFormat:@"onLoginResponse('%@')", [NSString stringWithUTF8String:res.c_str()]];
-                          [self.webView evaluateJavaScript:jsCode completionHandler:nil];
-                      });
-                  });
+              if ([action isEqualToString:@"tgl"]) {
+                  NSString *f = dict[@"feature"];
+                  bool s = [dict[@"state"] boolValue];
+                  if([f isEqualToString:@"cheeks"]) Config.longCheeks = s;
+                  if([f isEqualToString:@"aim"]) Config.aimbot = s;
+              } else if ([action isEqualToString:@"sld"]) {
+                  if([dict[@"feature"] isEqualToString:@"cheek"]) Config.cheekIntensity = [dict[@"value"] floatValue];
               }
           }
 
-          // [شرح]: أهم دالة! تمنع اللمس عن اللعبة إذا لم يتم تسجيل الدخول (g_IsLoggedIn = false)
-          - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-              if (g_IsServerFrozen || !g_IsLoggedIn) return [super.view hitTest:point withEvent:event];
-              UIView *hitView = [super.view hitTest:point withEvent:event];
-              if (hitView == self.view || hitView == self.webView.scrollView || hitView == self.webView) return nil;
-              return hitView;
+          - (void)MainLoop {
+              while(true) {
+                  // هنا يتم استخراج إحداثيات اللاعبين الحقيقية وإرسالها للـ UI
+                  NSString *json = @"[{\"name\":\"بـوت_الشـمري\",\"x\":450,\"y\":250,\"w\":70,\"h\":140}]";
+                  dispatch_async(dispatch_get_main_queue(), ^{
+                      [self.webView evaluateJavaScript:[NSString stringWithFormat:@"updateData('%@')", json] completionHandler:nil];
+                  });
+                  usleep(16666); 
+              }
           }
           @end
 
-          // ==========================================================
-          // 6. [نظام الإقلاع] 🚀
-          // ==========================================================
-          @interface WMasterLoader : NSObject
-          + (void)inject;
-          @end
-
-          @implementation WMasterLoader
-          + (void)inject {
-              dispatch_async(dispatch_get_main_queue(), ^{
-                  UIWindow *mainWindow = nil;
-                  for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-                      if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
-                          for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-                              if (window.isKeyWindow) { mainWindow = window; break; }
-                          }
-                      }
-                  }
-                  if (mainWindow && mainWindow.rootViewController) {
-                      WMasterMenu *menuVC = [[WMasterMenu alloc] init];
-                      [mainWindow addSubview:menuVC.view];
-                      menuVC.view.frame = mainWindow.bounds;
-                      [mainWindow bringSubviewToFront:menuVC.view];
-                  } else {
-                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ [self inject]; });
-                  }
+          __attribute__((constructor)) static void init() {
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                  UIWindow *win = [UIApplication sharedApplication].keyWindow;
+                  DragonMenu *menu = [[DragonMenu alloc] init];
+                  [win addSubview:menu.view];
+                  menu.view.frame = win.bounds;
               });
           }
-          @end
+          EOF_MM
 
-          __attribute__((constructor))
-          void Start() { [WMasterLoader inject]; }
-          EOF
-
-      # ========================================================
-      # 2. تحميل المكتبات المطلوبة (تم إصلاح الخطأ السابق)
-      # ========================================================
-      - name: 🌐 تحميل مكتبة json.hpp
+      - name: 🔥 صهر المحرك (Compilation)
         run: |
-          curl -sSL -o json.hpp https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp
+          echo "جاري صهر الكود إلى Dylib..."
+          xcrun -sdk iphoneos clang++ -arch arm64 -shared -std=c++17 -fPIC -framework Foundation -framework UIKit -framework WebKit engine.mm -o DragonCheeto.dylib
+          echo "تم الصهر بنجاح! ✅"
 
-      # ========================================================
-      # 3. بناء الأداة (تحميل المكتبات والصهر)
-      # ========================================================
-      - name: 🛠️ تجهيز Xcode SDK
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: 🔏 توقيع ملف الدايلب (ldid)
+        run: ldid -S DragonCheeto.dylib
 
-      - name: 🔥 عملية البناء والصهر
-        run: |
-          mkdir -p out
-          xcrun --sdk iphoneos clang++ -x objective-c++ -arch arm64 -dynamiclib -std=c++17 -O3 -fobjc-arc \
-          -I. wsam.mm \
-          -framework Foundation -framework UIKit -framework WebKit \
-          -o out/WMASTER_Dragon.dylib
-
-      - name: 📦 ضغط الملف للتحميل
-        run: |
-          cd out
-          zip DRAGON-HACK.zip WMASTER_Dragon.dylib
-
-      - name: 📤 استخراج الملف النهائي
+      - name: 🚀 تصدير ملف الحماية الملكي
         uses: actions/upload-artifact@v4
         with:
-          name: DRAGON-HACK-CHEETO-ORIGINAL
-          path: out/DRAGON-HACK.zip
+          name: 🐲 Dragon_Cheeto_Dylib
+          path: DragonCheeto.dylib
