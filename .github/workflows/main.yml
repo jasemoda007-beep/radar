@@ -1,0 +1,21 @@
+name: Build Wessam Mod
+on: [push]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git ~/theos
+          git clone https://github.com/Theos-SDKS/iOS-SDKs.git ~/theos/sdks
+      - name: Build
+        run: |
+          export THEOS=~/theos
+          make package FINALPACKAGE=1
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: Pro-Dylib
+          path: packages/*.deb
+          
