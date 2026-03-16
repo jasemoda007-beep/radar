@@ -24,16 +24,17 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
+    // مسار الكاميرا الأساسي
     int Ptr1 = 0x38;
     int Ptr2 = 0x78;
     int Ptr3 = 0x30;
+    
+    // 🔥 أوفستات الموسم الحالي (من المهندس أحمد) 🔥
     int CameraManager = 0x548;
+    int CameraPOV = 0x10a0 + 0x10; // (PovOffset + 0x10)
+    int SelfOffset = 0x28d0;
     
-    // 🔥 رجعنا لكاميرا Dolphins الأصلية 🔥
-    int CameraPOV = 0x10b0; 
-    
-    // 🔥 أوفستات مسعود لموقع العدو (من ملف Dolphins) 🔥
-    int RootComponent = 0x2c0; // MoveCoordOffset
+    int RootComponent = 0x110;    // MoveCoordOffset
     int RelativeLocation = 0x208; // CoordOffset
 }
 
@@ -61,7 +62,6 @@ uintptr_t get_base(const char* module) {
 
 template <typename T>
 T ReadMem(uintptr_t address) {
-    // حماية قصوى: لا تقرأ إذا العنوان فارغ أو خارج نطاق الذاكرة الصحيح
     if (address > 0x100000000 && address < 0x2000000000) {
         return *(T*)address;
     }
@@ -106,7 +106,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
-    // إجبار دائم لحماية الرياضيات من الكراش
+    // إجبار دائم للـ FOV لحماية اللعبة
     float safeFov = 90.0f; 
     
     ImVec2 screenCoord;
@@ -117,7 +117,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار (المستقر + أوفستات دولفينز) ]
+// [ 4. محرك الرادار الأساسي ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
@@ -135,13 +135,13 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     uintptr_t ptr2 = ReadMem<uintptr_t>(ptr1 + Offsets::Ptr2);
     uintptr_t playerController = ReadMem<uintptr_t>(ptr2 + Offsets::Ptr3);
     uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
+    uintptr_t selfActor = ReadMem<uintptr_t>(playerController + Offsets::SelfOffset);
     
     if (!cameraManager) return;
 
     MinimalViewInfo pov;
-    // قراءة الكاميرا بترتيب ملفك القديم (0x0 موقع، 0x18 زاوية)
     pov.location = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV + 0x0);
-    pov.rotation = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV + 0x18); 
+    pov.rotation = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV + 0xC); 
     pov.fov = 90.0f; 
 
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
@@ -154,44 +154,43 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
 
     for (int i = 0; i < actorCount; i++) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
-        if (!actor) continue;
+        if (!actor || actor == selfActor) continue; // تخطي اللاعب نفسه
 
-        // قراءة الروت الخاص بملفك القديم 0x2c0
+        // استخدام أوفست أحمد للروت: 0x110
         uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
-        if (!rootComponent) {
-            // إذا فشل الـ 0x2c0، جرب 0x158 (القياسي) بأمان
-            rootComponent = ReadMem<uintptr_t>(actor + 0x158);
-            if (!rootComponent) continue;
-        }
+        if (!rootComponent) continue;
         
-        // قراءة الموقع الخاص بملفك القديم 0x208
+        // استخدام أوفست أحمد للموقع: 0x208
         ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
         
-        // إذا فشل الـ 0x208، جرب 0x120 (القياسي) بأمان
-        if (actorLocation.x == 0 && actorLocation.y == 0) {
-            actorLocation = ReadMem<ImVec3>(rootComponent + 0x120);
-        }
-        
-        // التحقق النهائي من صحة الإحداثيات
-        if (actorLocation.x == 0 && actorLocation.y == 0) continue;
-        if (actorLocation.x > 1000000 || actorLocation.x < -1000000) continue; 
+        if (actorLocation.x == 0 && actorLocation.y == 0 && actorLocation.z == 0) continue;
+        if (actorLocation.x > 2000000 || actorLocation.x < -2000000) continue; 
         
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
         // الرسم
         if (screenPos.x > -200 && screenPos.y > -200 && screenPos.x < screenSize.x + 200) {
-            draw->AddRect(ImVec2(screenPos.x - 20, screenPos.y - 40), 
-                          ImVec2(screenPos.x + 20, screenPos.y + 40), 
+            
+            // حساب مسافة تقريبية لضبط حجم المربع
+            float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2)) / 100.0f;
+            if (distance < 1.0f || distance > 800.0f) continue;
+            
+            float boxWidth = 800.0f / distance;
+            float boxHeight = 1600.0f / distance;
+            
+            draw->AddRect(ImVec2(screenPos.x - (boxWidth / 2), screenPos.y - boxHeight), 
+                          ImVec2(screenPos.x + (boxWidth / 2), screenPos.y), 
                           IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
+                          
             draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
-                          ImVec2(screenPos.x, screenPos.y + 40), 
+                          ImVec2(screenPos.x, screenPos.y), 
                           IM_COL32(255, 255, 255, 100), 1.0f);
             drawnCount++;
         }
     }
     
     char debugText[256];
-    sprintf(debugText, "Actors: %d | Drawn: %d | Cam Z: %.1f", actorCount, drawnCount, pov.location.z);
+    sprintf(debugText, "Actors: %d | Drawn: %d | Season Updated! 🔥", actorCount, drawnCount);
     draw->AddText(ImVec2(screenSize.x / 2 - 150, 80), IM_COL32(0, 255, 0, 255), debugText);
 }
 
