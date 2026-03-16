@@ -1,44 +1,45 @@
-name: Build Wessam Pro Mod
+name: Build Wessam Pro Dylib
 
-on: [push, workflow_dispatch]
+# متى يشتغل السيرفر؟ عند رفع أي تعديل أو تشغيله يدوياً
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-latest # نستخدم سيرفرات ماك لضمان التوافق مع iOS
+
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fetch ImGui Library
+      - name: Install Dependencies (ldid & dpkg)
         run: |
-          mkdir -p ImGui
-          git clone --depth 1 https://github.com/ocornut/imgui.git temp_imgui
-          cp temp_imgui/*.cpp ImGui/
-          cp temp_imgui/*.h ImGui/
-          cp temp_imgui/backends/imgui_impl_metal.* ImGui/
-          rm -rf temp_imgui
-
-      - name: Setup Theos
-        run: |
-          sudo xcode-select -s /Applications/Xcode.app
           brew install ldid
-          export THEOS=~/theos
-          rm -rf $THEOS
-          git clone --recursive --depth 1 https://github.com/theos/theos.git $THEOS
-          mkdir -p $THEOS/sdks
-          curl -L https://github.com/theos/sdks/archive/master.zip -o sdks.zip
-          unzip -q sdks.zip -d $THEOS/sdks
-          mv $THEOS/sdks/sdks-master/* $THEOS/sdks/
-          rm -rf $THEOS/sdks/sdks-master sdks.zip
-          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          brew install dpkg
 
-      - name: Build Dylib
+      - name: Setup Theos (بيئة البناء)
         run: |
-          export THEOS=~/theos
-          make package FINALPACKAGE=1
-          
-      - name: Upload Build
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          echo "THEOS=~/theos" >> $GITHUB_ENV
+
+      - name: Setup iOS SDKs (مكاتب أبل)
+        run: |
+          curl -LO https://github.com/theos/sdks/archive/master.zip
+          unzip -q master.zip
+          mv sdks-master/* ~/theos/sdks/
+          rm -rf master.zip sdks-master
+
+      - name: Build Tweak (عملية الصهر)
+        run: |
+          make clean
+          make FINALPACKAGE=1
+
+      - name: Upload Dylib Artifact (رفع السبيكة الجاهزة)
         uses: actions/upload-artifact@v4
         with:
-          name: Wessam-Pro-Build
-          path: packages/*.deb
+          name: WessamMod-Dylib-Ready
+          # هنا السيرفر راح يبحث عن ملف الدايلب ويسحبه لك عشان تحمله
+          path: .theos/obj/**/*.dylib 
+          
