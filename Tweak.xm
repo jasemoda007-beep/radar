@@ -7,14 +7,23 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 0. إعدادات السيرفر والمود ]
+// [ 1. الأوفستات والعناوين الأساسية ]
 // ==========================================
 namespace ServerConfig {
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
     NSString *OffsetsJSON = @"http://34.204.178.160/manager/offsets.json";
 }
 
-namespace Offsets { int Recoil = 0xc50; }
+namespace Global {
+    uintptr_t GWorld = 0x10A4A1960; // تأكد إن هذا الأوفست يطابق نسختك
+}
+
+namespace Offsets {
+    int ULevel = 0x30;
+    int ActorArray = 0xA0;
+    int ActorCount = 0xA8;
+    int Recoil = 0xc50;
+}
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
 ModState g_State = LOGIN;
@@ -29,7 +38,112 @@ struct UserData {
 bool radarBox = true, aimbot = false, noRecoil = false;
 
 // ==========================================
-// [ 1. واجهات ImGui ]
+// [ 2. محرك قراءة الذاكرة (Memory Tools) ]
+// ==========================================
+uintptr_t get_base(const char* module) {
+    if(!module) return (uintptr_t)_dyld_get_image_header(0);
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; i++) {
+        if (strstr(_dyld_get_image_name(i), module)) return (uintptr_t)_dyld_get_image_header(i);
+    }
+    return 0;
+}
+
+template <typename T>
+T ReadMem(uintptr_t address) {
+    if (address > 0x100000000 && address < 0x2000000000) {
+        return *(T*)address;
+    }
+    return T{};
+}
+
+// ==========================================
+// [ 3. محرك الرياضيات (W2S Engine) ]
+// ==========================================
+struct Ue4Matrix {
+    float m[4][4];
+    float* operator[](int index) { return m[index]; }
+};
+
+struct ImVec3 {
+    float x, y, z;
+    ImVec3() : x(0), y(0), z(0) {}
+    ImVec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+    ImVec3 operator-(const ImVec3& other) const { return ImVec3(x - other.x, y - other.y, z - other.z); }
+    static float Dot(const ImVec3& a, const ImVec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+};
+
+struct Ue4Rotator { float pitch, yaw, roll; };
+struct MinimalViewInfo { ImVec3 location; Ue4Rotator rotation; float fov; };
+
+Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
+    float radPitch = rotation.pitch * ((float) M_PI / 180.0f);
+    float radYaw = rotation.yaw * ((float) M_PI / 180.0f);
+    float radRoll = rotation.roll * ((float) M_PI / 180.0f);
+    
+    float SP = sinf(radPitch); float CP = cosf(radPitch);
+    float SY = sinf(radYaw);   float CY = cosf(radYaw);
+    float SR = sinf(radRoll);  float CR = cosf(radRoll);
+    
+    Ue4Matrix matrix;
+    matrix[0][0] = (CP * CY); matrix[0][1] = (CP * SY); matrix[0][2] = (SP); matrix[0][3] = 0;
+    matrix[1][0] = (SR * SP * CY - CR * SY); matrix[1][1] = (SR * SP * SY + CR * CY); matrix[1][2] = (-SR * CP); matrix[1][3] = 0;
+    matrix[2][0] = (-(CR * SP * CY + SR * SY)); matrix[2][1] = (CY * SR - CR * SP * SY); matrix[2][2] = (CR * CP); matrix[2][3] = 0;
+    matrix[3][0] = 0; matrix[3][1] = 0; matrix[3][2] = 0; matrix[3][3] = 1;
+    return matrix;
+}
+
+ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 screenCenter) {
+    Ue4Matrix tempMatrix = rotatorToMatrix(camViewInfo.rotation);
+    ImVec3 vAxisX(tempMatrix[0][0], tempMatrix[0][1], tempMatrix[0][2]);
+    ImVec3 vAxisY(tempMatrix[1][0], tempMatrix[1][1], tempMatrix[1][2]);
+    ImVec3 vAxisZ(tempMatrix[2][0], tempMatrix[2][1], tempMatrix[2][2]);
+    
+    ImVec3 vDelta = worldLocation - camViewInfo.location;
+    ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
+    if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
+    
+    ImVec2 screenCoord;
+    float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
+    screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
+    screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
+    return screenCoord;
+}
+
+// ==========================================
+// [ 4. محرك الرادار (ESP Loop - فحص النبض) ]
+// ==========================================
+void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
+    if (!radarBox) return;
+
+    uintptr_t baseAddr = get_base(NULL); 
+    uintptr_t gWorld = ReadMem<uintptr_t>(baseAddr + Global::GWorld);
+    
+    if (!gWorld) {
+        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "GWorld Not Found!");
+        return;
+    }
+
+    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
+    if (!uLevel) {
+        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "ULevel Not Found!");
+        return;
+    }
+
+    uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
+    int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
+    
+    // طباعة النتيجة على الشاشة
+    char infoText[256];
+    sprintf(infoText, "[+] Memory Hooked! Actors Count: %d", actorCount);
+    draw->AddText(ImVec2(screenSize.x / 2 - 130, 80), IM_COL32(0, 255, 0, 255), infoText);
+    
+    // مربع تجريبي للتأكد من الرسم
+    draw->AddRect(ImVec2(screenSize.x / 2 - 50, 120), ImVec2(screenSize.x / 2 + 50, 220), IM_COL32(255, 255, 0, 255), 0, 0, 2.0f);
+}
+
+// ==========================================
+// [ 5. واجهات ImGui ]
 // ==========================================
 void ShowUI() {
     ImGui::SetNextWindowSize(ImVec2(600, 450), ImGuiCond_FirstUseEver);
@@ -75,7 +189,7 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 2. الطبقة العائمة (بأسلوب Dolphins الأصلي) ]
+// [ 6. الطبقة العائمة (بأسلوب Dolphins) ]
 // ==========================================
 @interface WessamView : MTKView <MTKViewDelegate>
 @property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
@@ -88,14 +202,9 @@ void ShowUI() {
         self.clearColor = MTLClearColorMake(0, 0, 0, 0);
         self.device = MTLCreateSystemDefaultDevice();
         self.delegate = self;
-        
-        // التمدد التلقائي مع اللعبة
         self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        
-        // السماح باللمس الأصلي
         self.userInteractionEnabled = YES;
         
-        // إصلاح الأبعاد (الريتنا)
         CGFloat scale = [UIScreen mainScreen].scale;
         self.contentScaleFactor = scale;
 
@@ -114,14 +223,11 @@ void ShowUI() {
     return self;
 }
 
-// ==========================================
-// [ 3. محرك اللمس الأصلي (بدون هوك!) ]
-// ==========================================
 - (void)updateIOWithTouches:(NSSet<UITouch *> *)touches {
     ImGuiIO& io = ImGui::GetIO();
     UITouch *touch = [touches anyObject];
     if (touch) {
-        CGPoint loc = [touch locationInView:self]; // هنا الآيفون يحسبها صح 100%
+        CGPoint loc = [touch locationInView:self]; 
         io.MousePos = ImVec2(loc.x, loc.y);
         if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
         else if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
@@ -133,27 +239,17 @@ void ShowUI() {
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouches:touches]; }
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouches:touches]; }
 
-// تمرير اللمس للعبة إذا كان المنيو مغلق
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hitView = [super hitTest:point withEvent:event];
-    if (hitView == self && !showMenu) {
-        return nil; // تمرير اللمس لببجي
-    }
+    if (hitView == self && !showMenu) return nil; 
     return hitView;
 }
 
-// دالة الإخفاء والإظهار بثلاث أصابع
-- (void)toggleMenu {
-    showMenu = !showMenu;
-}
+- (void)toggleMenu { showMenu = !showMenu; }
 
-// ==========================================
-// [ 4. محرك الرسم ]
-// ==========================================
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
 
 - (void)drawInMTKView:(MTKView *)view {
-    // إذا المنيو مخفي والرادار مطفي، لا ترسم أي شيء (لتوفير البطارية)
     if (!showMenu && !radarBox) return;
 
     ImGuiIO& io = ImGui::GetIO();
@@ -166,50 +262,37 @@ void ShowUI() {
     ImGui_ImplMetal_NewFrame(desc);
     ImGui::NewFrame();
 
-    // ---------------------------------------------------
-    // 🔥 هذا هو الكود اللي سألت عنه مكانه هنا بالضبط 🔥
-    
-    // استدعاء واجهة المنيو
+    // 1. رسم الواجهة
     if (showMenu) ShowUI();
     
-    // استدعاء محرك الرادار (ESP)
+    // 2. رسم الرادار (الدالة معرفة فوق، فماكو إيرور بعد!)
     if (radarBox) {
         ImDrawList* draw = ImGui::GetBackgroundDrawList();
-        DrawESP(draw, io.DisplaySize); // إرسال قلم الرسم وأبعاد الشاشة لمحرك الرادار
+        DrawESP(draw, io.DisplaySize);
     }
 
     ImGui::Render();
-    // ---------------------------------------------------
-
     id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
     ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), buffer, encoder);
     [encoder endEncoding];
     [buffer presentDrawable:view.currentDrawable];
     [buffer commit];
 }
-
 @end
 
 // ==========================================
-// [ 5. التشغيل الذكي (إصلاح تشنج متصفح تسجيل الدخول) ]
+// [ 7. التشغيل الذكي والربط ]
 // ==========================================
 static void didFinishLaunching(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef info) {
-    // ننتظر 5 ثواني حتى تفتح اللعبة وتستقر شاشتها
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        
         UIWindow *mainWindow = [UIApplication sharedApplication].keyWindow;
         if (!mainWindow) mainWindow = [[UIApplication sharedApplication].windows firstObject];
         
-        // 🔥 السر هنا: نحقن داخل اللعبة فقط، حتى ما نغطي على متصفح جوجل (Safari) 🔥
         UIViewController *rootVC = mainWindow.rootViewController;
-        
         if (rootVC && rootVC.view) {
             WessamView *overlay = [[WessamView alloc] initWithFrame:rootVC.view.bounds];
-            
-            // تم إزالة layer.zPosition = 99999 لمنع التشنج
             [rootVC.view addSubview:overlay];
             
-            // إضافة حساس أبل الأصلي للإخفاء بـ 3 أصابع
             UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:overlay action:@selector(toggleMenu)];
             tap.numberOfTouchesRequired = 3;
             [rootVC.view addGestureRecognizer:tap];
@@ -217,131 +300,6 @@ static void didFinishLaunching(CFNotificationCenterRef center, void *observer, C
     });
 }
 
-// دالة البدء التلقائي (بدون هوك)
 __attribute__((constructor)) static void initialize() {
     CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL, &didFinishLaunching, (CFStringRef)UIApplicationDidFinishLaunchingNotification, NULL, CFNotificationSuspensionBehaviorDrop);
 }
-
-
-// ==========================================
-// [ 6. محرك الرياضيات والتحويل (W2S Engine) ]
-// ==========================================
-struct Ue4Matrix {
-    float m[4][4];
-    float* operator[](int index) { return m[index]; }
-};
-
-struct ImVec3 {
-    float x, y, z;
-    ImVec3() : x(0), y(0), z(0) {}
-    ImVec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
-    ImVec3 operator-(const ImVec3& other) const { return ImVec3(x - other.x, y - other.y, z - other.z); }
-    static float Dot(const ImVec3& a, const ImVec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-};
-
-struct Ue4Rotator { float pitch, yaw, roll; };
-struct MinimalViewInfo { ImVec3 location; Ue4Rotator rotation; float fov; };
-
-// دالة تحويل زاوية الكاميرا إلى مصفوفة رياضية
-Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
-    float radPitch = rotation.pitch * ((float) M_PI / 180.0f);
-    float radYaw = rotation.yaw * ((float) M_PI / 180.0f);
-    float radRoll = rotation.roll * ((float) M_PI / 180.0f);
-    
-    float SP = sinf(radPitch); float CP = cosf(radPitch);
-    float SY = sinf(radYaw);   float CY = cosf(radYaw);
-    float SR = sinf(radRoll);  float CR = cosf(radRoll);
-    
-    Ue4Matrix matrix;
-    matrix[0][0] = (CP * CY);
-    matrix[0][1] = (CP * SY);
-    matrix[0][2] = (SP);
-    matrix[0][3] = 0;
-    
-    matrix[1][0] = (SR * SP * CY - CR * SY);
-    matrix[1][1] = (SR * SP * SY + CR * CY);
-    matrix[1][2] = (-SR * CP);
-    matrix[1][3] = 0;
-    
-    matrix[2][0] = (-(CR * SP * CY + SR * SY));
-    matrix[2][1] = (CY * SR - CR * SP * SY);
-    matrix[2][2] = (CR * CP);
-    matrix[2][3] = 0;
-    
-    matrix[3][0] = 0; matrix[3][1] = 0; matrix[3][2] = 0; matrix[3][3] = 1;
-    return matrix;
-}
-
-// دالة تحويل العالم 3D إلى الشاشة 2D
-ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 screenCenter) {
-    Ue4Matrix tempMatrix = rotatorToMatrix(camViewInfo.rotation);
-    
-    ImVec3 vAxisX(tempMatrix[0][0], tempMatrix[0][1], tempMatrix[0][2]);
-    ImVec3 vAxisY(tempMatrix[1][0], tempMatrix[1][1], tempMatrix[1][2]);
-    ImVec3 vAxisZ(tempMatrix[2][0], tempMatrix[2][1], tempMatrix[2][2]);
-    
-    ImVec3 vDelta = worldLocation - camViewInfo.location;
-    ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
-    
-    if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; // منع انقلاب الشاشة خلف الكاميرا
-    
-    ImVec2 screenCoord;
-    float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
-    screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
-    screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
-    
-    return screenCoord;
-}
-
-
-
-// ==========================================
-// [ 7. محرك قراءة الذاكرة الآمن (Memory Reader) ]
-// ==========================================
-// دالة تقرأ الذاكرة بأمان وبدون ما تكرش اللعبة إذا العنوان فارغ
-template <typename T>
-T ReadMem(uintptr_t address) {
-    if (address > 0x100000000 && address < 0x2000000000) {
-        return *(T*)address;
-    }
-    return T{};
-}
-
-// ==========================================
-// [ 8. محرك الرادار (ESP Loop - فحص النبض) ]
-// ==========================================
-void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
-    if (!radarBox) return;
-
-    // 1. قراءة الـ Base Address (عنوان اللعبة الرئيسي)
-    uintptr_t baseAddr = get_base(NULL); 
-    
-    // 2. قراءة عالم اللعبة GWorld
-    uintptr_t gWorld = ReadMem<uintptr_t>(baseAddr + Global::GWorld);
-    if (!gWorld) {
-        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "GWorld Not Found!");
-        return;
-    }
-
-    // 3. قراءة المرحلة الحالية ULevel
-    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
-    if (!uLevel) {
-        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "ULevel Not Found!");
-        return;
-    }
-
-    // 4. قراءة مصفوفة اللاعبين وعددهم (ActorArray & ActorCount)
-    uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
-    int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
-
-    // 5. طباعة النتيجة على الشاشة (للتأكد من الاختراق)
-    char infoText[256];
-    sprintf(infoText, "[+] Memory Hooked! Actors Count: %d", actorCount);
-    
-    draw->AddText(ImVec2(screenSize.x / 2 - 130, 80), IM_COL32(0, 255, 0, 255), infoText);
-    
-    // رسم مربع صغير للتأكد من جاهزية أداة الرسم
-    draw->AddRect(ImVec2(screenSize.x / 2 - 50, 120), ImVec2(screenSize.x / 2 + 50, 220), IM_COL32(255, 255, 0, 255), 0, 0, 2.0f);
-}
-
-
