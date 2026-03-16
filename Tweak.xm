@@ -99,6 +99,61 @@ Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
     float SR = sinf(radRoll);  float CR = cosf(radRoll);
     
     Ue4Matrix matrix;
+// ==========================================
+// [ 4. محرك الرادار (ESP Loop - وضع الفحص) ]
+// ==========================================
+void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
+    if (!radarBox) return;
+
+    uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
+    typedef uintptr_t (*GWorldFn)(uintptr_t);
+    GWorldFn get_gworld = (GWorldFn)(slide + Global::GWorld_Func);
+    uintptr_t gWorld = get_gworld(slide + Global::GWorld_Data);
+    
+    if (!gWorld) return;
+
+    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
+    if (!uLevel) return;
+
+    // قراءة الكاميرا
+    uintptr_t ptr1 = ReadMem<uintptr_t>(gWorld + Offsets::Ptr1);
+    uintptr_t ptr2 = ReadMem<uintptr_t>(ptr1 + Offsets::Ptr2);
+    uintptr_t playerController = ReadMem<uintptr_t>(ptr2 + Offsets::Ptr3);
+    uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
+    
+    MinimalViewInfo pov = ReadMem<MinimalViewInfo>(cameraManager + Offsets::CameraPOV);
+
+    uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
+    int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
+    
+    // 🚨 [ شاشة المراقبة للمهندس مسعود ] 🚨
+    char debugText[256];
+    sprintf(debugText, "Actors: %d | Cam X: %.1f | Cam Y: %.1f", actorCount, pov.location.x, pov.location.y);
+    draw->AddText(ImVec2(100, 100), IM_COL32(0, 255, 0, 255), debugText);
+
+    if (actorCount < 1 || actorCount > 10000) return;
+    
+    ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
+
+    for (int i = 0; i < actorCount; i++) {
+        uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
+        if (!actor) continue;
+
+        uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
+        if (!rootComponent) continue;
+        
+        ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
+        
+        ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
+
+        // 🚨 لغينا كل الشروط، ارسم المربع وين ما كان حتى لو غلط! 🚨
+        if (screenPos.x > -2000 && screenPos.y > -2000 && screenPos.x < screenSize.x + 2000) {
+            draw->AddRect(ImVec2(screenPos.x - 20, screenPos.y - 40), 
+                          ImVec2(screenPos.x + 20, screenPos.y + 40), 
+                          IM_COL32(255, 0, 0, 255), 0, 0, 2.0f);
+        }
+    }
+}
     matrix[0][0] = (CP * CY); matrix[0][1] = (CP * SY); matrix[0][2] = (SP); matrix[0][3] = 0;
     matrix[1][0] = (SR * SP * CY - CR * SY); matrix[1][1] = (SR * SP * SY + CR * CY); matrix[1][2] = (-SR * CP); matrix[1][3] = 0;
     matrix[2][0] = (-(CR * SP * CY + SR * SY)); matrix[2][1] = (CY * SR - CR * SP * SY); matrix[2][2] = (CR * CP); matrix[2][3] = 0;
@@ -124,72 +179,6 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop) ]
-// ==========================================
-void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
-    if (!radarBox) return;
-
-    uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
-    typedef uintptr_t (*GWorldFn)(uintptr_t);
-    GWorldFn get_gworld = (GWorldFn)(slide + Global::GWorld_Func);
-    uintptr_t gWorld = get_gworld(slide + Global::GWorld_Data);
-    
-    if (!gWorld) return;
-
-    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
-    if (!uLevel) return;
-
-    // قراءة الكاميرا الخاصة باللاعب من أوفستات مسعود
-    uintptr_t ptr1 = ReadMem<uintptr_t>(gWorld + Offsets::Ptr1);
-    uintptr_t ptr2 = ReadMem<uintptr_t>(ptr1 + Offsets::Ptr2);
-    uintptr_t playerController = ReadMem<uintptr_t>(ptr2 + Offsets::Ptr3);
-    uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
-    
-    MinimalViewInfo pov = ReadMem<MinimalViewInfo>(cameraManager + Offsets::CameraPOV);
-    uintptr_t selfActor = ReadMem<uintptr_t>(playerController + Offsets::SelfOffset);
-
-    uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
-    int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
-    
-    if (actorCount < 1 || actorCount > 10000) return;
-    
-    ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
-
-    for (int i = 0; i < actorCount; i++) {
-        uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
-        if (!actor) continue;
-
-        // تجاهل اللاعب نفسه حتى ما يرسم مربع عليك
-        if (actor == selfActor) continue;
-
-        uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
-        if (!rootComponent) continue;
-        
-        ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
-        
-        // التحويل إلى الشاشة باستخدام الكاميرا الحقيقية
-        ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
-
-        // إذا كان ضمن حدود الشاشة، ارسم!
-        if (screenPos.x > 0 && screenPos.y > 0 && screenPos.x < screenSize.x && screenPos.y < screenSize.y) {
-            
-            // حساب المسافة حتى نتحكم بحجم المربع
-            float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2) + pow(pov.location.z - actorLocation.z, 2)) / 100.0f;
-            if (distance < 1.0f || distance > 600.0f) continue;
-            
-            float boxWidth = 800.0f / distance;
-            float boxHeight = 1600.0f / distance;
-            
-            draw->AddRect(ImVec2(screenPos.x - (boxWidth / 2), screenPos.y - boxHeight), 
-                          ImVec2(screenPos.x + (boxWidth / 2), screenPos.y), 
-                          IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
-                          
-            draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
-                          ImVec2(screenPos.x, screenPos.y), 
-                          IM_COL32(255, 255, 255, 100), 1.0f);
-        }
-    }
-}
 
 // ==========================================
 // [ 5. واجهات ImGui ]
