@@ -15,9 +15,6 @@ namespace ServerConfig {
     NSString *OffsetsJSON = @"http://34.204.178.160/manager/offsets.json";
 }
 
-// ==========================================
-// [ 1. بنك الأوفستات والعناوين المتكامل ]
-// ==========================================
 namespace Global {
     uintptr_t GWorld = 0x10A4A1960;
     uintptr_t GNames = 0x10A0557E0;
@@ -36,13 +33,10 @@ namespace Offsets {
     int Recoil = 0xc50;
 }
 
-// ==========================================
-// [ 2. المتغيرات، الحالات، والبيانات ]
-// ==========================================
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
 ModState g_State = LOGIN;
 bool showMenu = true; 
-bool imguiInitialized = false; // متغير لحماية اللعبة من الكراش
+bool imguiInitialized = false; 
 NSArray *g_OnlineBypass = nil;
 
 struct UserData {
@@ -54,9 +48,6 @@ struct UserData {
 
 bool radarBox = true, aimbot = false, noRecoil = false;
 
-// ==========================================
-// [ 3. محرك الذاكرة ]
-// ==========================================
 uintptr_t get_base(const char* module) {
     if(!module) return (uintptr_t)_dyld_get_image_header(0);
     uint32_t count = _dyld_image_count();
@@ -80,9 +71,6 @@ void patch_memory(uintptr_t addr, NSString *hex) {
     vm_protect(mach_task_self(), (vm_address_t)addr, data.length, FALSE, VM_PROT_READ | VM_PROT_EXECUTE);
 }
 
-// ==========================================
-// [ 4. محرك السيرفر (JSON & API) ]
-// ==========================================
 void fetch_json_and_inject() {
     NSURL *url = [NSURL URLWithString:ServerConfig::OffsetsJSON];
     NSData *data = [NSData dataWithContentsOfURL:url];
@@ -115,9 +103,9 @@ void login_process(NSString *key) {
                     g_User.startDate = dataParts[2];
                     g_User.endDate = dataParts[3];
                 } else {
-                    g_User.type = @"اشتراك مدفوع";
-                    g_User.startDate = @"اليوم";
-                    g_User.endDate = @"غير محدد";
+                    g_User.type = @"VIP Sub";
+                    g_User.startDate = @"Today";
+                    g_User.endDate = @"Unlimited";
                 }
                 fetch_json_and_inject();
                 g_State = SUCCESS_CARD;
@@ -129,64 +117,65 @@ void login_process(NSString *key) {
 }
 
 // ==========================================
-// [ 5. واجهات ImGui ]
+// [ 5. واجهات ImGui (النسخة الإنجليزية الطولية) ]
 // ==========================================
 void ShowUI() {
-    ImGui::SetNextWindowSize(ImVec2(380, 280), ImGuiCond_FirstUseEver);
+    // تصميم طولي (خدود طويلة) مع حجم كبير متناسق
+    ImGui::SetNextWindowSize(ImVec2(550, 950), ImGuiCond_FirstUseEver);
     
     if (g_State == LOGIN || g_State == ACTIVATING) {
-        ImGui::Begin("🛰️ WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
+        ImGui::Begin("WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
         if (g_State == LOGIN) {
             static char k[64] = "";
-            ImGui::Text("يرجى إدخال مفتاح التفعيل الخاص بك:");
+            ImGui::Text("Enter Activation Key:");
             ImGui::InputText("##key", k, 64);
             ImGui::Spacing();
-            if (ImGui::Button("تفعيل المود 🚀", ImVec2(-1, 45))) {
+            if (ImGui::Button("ACTIVATE MOD", ImVec2(-1, 80))) {
                 login_process([NSString stringWithUTF8String:k]);
             }
         } else {
-            ImGui::TextColored(ImVec4(1, 1, 0, 1), "⏳ جاري الاتصال بالسيرفر والتحقق...");
-            ImGui::Text("الرجاء الانتظار...");
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Connecting to Server...");
+            ImGui::Text("Please wait...");
         }
         ImGui::End();
     } 
     else if (g_State == SUCCESS_CARD) {
-        ImGui::Begin("✅ معلومات الاشتراك", &showMenu, ImGuiWindowFlags_NoCollapse);
-        ImGui::TextColored(ImVec4(0, 1, 0, 1), "تم تفعيل التويك بنجاح!");
+        ImGui::Begin("SUCCESS", &showMenu, ImGuiWindowFlags_NoCollapse);
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "Mod Activated Successfully!");
         ImGui::Separator();
-        ImGui::Text("المفتاح: %s", [g_User.key UTF8String]);
-        ImGui::Text("نوع الاشتراك: %s", [g_User.type UTF8String]);
-        ImGui::Text("البداية: %s", [g_User.startDate UTF8String]);
-        ImGui::Text("النهاية: %s", [g_User.endDate UTF8String]);
+        ImGui::Text("Key: %s", [g_User.key UTF8String]);
+        ImGui::Text("Type: %s", [g_User.type UTF8String]);
+        ImGui::Text("Start: %s", [g_User.startDate UTF8String]);
+        ImGui::Text("End: %s", [g_User.endDate UTF8String]);
         ImGui::Separator();
-        if (ImGui::Button("دخول إلى القائمة الرئيسية 🎮", ImVec2(-1, 45))) {
+        if (ImGui::Button("ENTER MAIN MENU", ImVec2(-1, 80))) {
             g_State = MAIN_MENU;
         }
         ImGui::End();
     } 
     else if (g_State == MAIN_MENU) {
-        ImGui::Begin("🛰️ WESSAM MOD PANEL", &showMenu);
+        ImGui::Begin("WESSAM MOD PANEL", &showMenu);
         if (ImGui::BeginTabBar("Tabs")) {
-            if (ImGui::BeginTabItem("👁️ الرادار")) {
-                ImGui::Checkbox("تفعيل صندوق العدو", &radarBox);
+            if (ImGui::BeginTabItem("ESP (Radar)")) {
+                ImGui::Checkbox("Enable ESP Boxes", &radarBox);
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("🎯 القتال")) {
-                ImGui::Checkbox("تفعيل الأيم بوت", &aimbot);
-                if (ImGui::Checkbox("تفعيل ثبات السلاح (No Recoil)", &noRecoil)) {
+            if (ImGui::BeginTabItem("Aimbot")) {
+                ImGui::Checkbox("Enable Magic Bullet", &aimbot);
+                if (ImGui::Checkbox("Enable No Recoil", &noRecoil)) {
                     uintptr_t addr = get_base(NULL) + Offsets::Recoil;
                     patch_memory(addr, noRecoil ? @"00 00 00 00" : @"00 00 A0 41");
                 }
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("🛡️ حماية السيرفر")) {
-                ImGui::TextColored(ImVec4(0, 1, 0, 1), "تم حقن الملفات التالية أونلاين:");
+            if (ImGui::BeginTabItem("Server Bypass")) {
+                ImGui::TextColored(ImVec4(0, 1, 0, 1), "Injected Online Bypasses:");
                 if (g_OnlineBypass) {
                     for (NSDictionary *item in g_OnlineBypass) {
                         ImGui::BulletText("%s", [item[@"name"] UTF8String]);
                     }
                 } else {
-                    ImGui::Text("لا توجد حماية محقونة حالياً.");
+                    ImGui::Text("No bypass loaded yet.");
                 }
                 ImGui::EndTabItem();
             }
@@ -197,7 +186,7 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 6. الطبقة العائمة (Overlay) المضمونة 100% ]
+// [ 6. الطبقة العائمة مع التكبير الإجباري ]
 // ==========================================
 @interface WessamOverlay : UIView <MTKViewDelegate>
 @property (nonatomic, strong) MTKView *mtkView;
@@ -208,7 +197,7 @@ void ShowUI() {
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO; // السماح للمس باختراق اللعبة
+        self.userInteractionEnabled = NO;
 
         self.mtkView = [[MTKView alloc] initWithFrame:frame];
         self.mtkView.device = MTLCreateSystemDefaultDevice();
@@ -221,7 +210,13 @@ void ShowUI() {
         
         ImGui::CreateContext();
         ImGui_ImplMetal_Init(self.mtkView.device);
-        imguiInitialized = true; // تم تشغيل المنيو بأمان!
+        
+        // التكبير الإجباري لشاشات الريتنا!
+        ImGuiIO& io = ImGui::GetIO();
+        io.FontGlobalScale = 2.5f; 
+        ImGui::GetStyle().ScaleAllSizes(2.5f);
+        
+        imguiInitialized = true;
     }
     return self;
 }
@@ -241,7 +236,7 @@ void ShowUI() {
     ImGui_ImplMetal_NewFrame(desc);
     ImGui::NewFrame();
 
-    ShowUI(); // رسم الواجهة
+    ShowUI();
 
     ImGui::Render();
     id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
@@ -253,14 +248,13 @@ void ShowUI() {
 @end
 
 // ==========================================
-// [ 7. محرك الهوك المطور (اللمس وحقن الشاشة) ]
+// [ 7. إصلاح إحداثيات اللمس للتحريك بحرية ]
 // ==========================================
 %hook UIWindow
 - (void)makeKeyAndVisible {
     %orig;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        // حقن الشاشة الشفافة بعد 3 ثواني من فتح اللعبة لضمان التحميل
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             WessamOverlay *overlay = [[WessamOverlay alloc] initWithFrame:self.bounds];
             [self addSubview:overlay];
@@ -269,24 +263,28 @@ void ShowUI() {
 }
 
 - (void)sendEvent:(UIEvent *)event {
-    %orig;
+    if (imguiInitialized) {
+        ImGuiIO& io = ImGui::GetIO();
+        UITouch *touch = [[event allTouches] anyObject];
+        
+        if (touch) {
+            // استخدام rootViewController لضمان قراءة إحداثيات العرض (Landscape) بدقة
+            UIView *targetView = self.rootViewController.view ? self.rootViewController.view : self;
+            CGPoint loc = [touch locationInView:targetView];
+            
+            io.MousePos = ImVec2(loc.x, loc.y);
+            
+            if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
+            else if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
+        }
+    }
     
-    // الحماية من الكراش! لا تقرأ اللمس إذا كان المنيو لم يُرسم بعد
-    if (!imguiInitialized) return;
-
-    ImGuiIO& io = ImGui::GetIO();
-    UITouch *touch = [[event allTouches] anyObject];
-    if (!touch) return;
-    
-    CGPoint loc = [touch locationInView:self];
-    
-    io.MousePos = ImVec2(loc.x, loc.y);
-    if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
-    if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
-
-    // الإخفاء والظهور بـ 3 أصابع
-    if ([[event allTouches] count] == 3 && touch.phase == UITouchPhaseBegan) {
+    // إخفاء/ظهور بـ 3 أصابع
+    UITouch *touch3 = [[event allTouches] anyObject];
+    if ([[event allTouches] count] == 3 && touch3 && touch3.phase == UITouchPhaseBegan) {
         showMenu = !showMenu;
     }
+
+    %orig;
 }
 %end
