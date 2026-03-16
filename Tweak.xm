@@ -85,54 +85,34 @@ void fetch_json_and_inject() {
     }
 }
 
-void login_process(NSString *key) {
-    g_State = ACTIVATING;
-    NSString *udid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
-    
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSString *urlStr = [NSString stringWithFormat:@"%@?key=%@&hwid=%@", ServerConfig::LoginAPI, key, udid];
-        NSURL *url = [NSURL URLWithString:urlStr];
-        NSString *response = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
-        
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([response containsString:@"SUCCESS"]) {
-                NSArray *dataParts = [response componentsSeparatedByString:@"|"];
-                g_User.key = key;
-                if (dataParts.count >= 4) {
-                    g_User.type = dataParts[1];
-                    g_User.startDate = dataParts[2];
-                    g_User.endDate = dataParts[3];
-                } else {
-                    g_User.type = @"VIP Sub";
-                    g_User.startDate = @"Today";
-                    g_User.endDate = @"Unlimited";
-                }
-                fetch_json_and_inject();
-                g_State = SUCCESS_CARD;
-            } else {
-                g_State = LOGIN;
-            }
-        });
-    });
-}
-
 // ==========================================
-// [ 5. واجهات ImGui (النسخة الإنجليزية الطولية) ]
+// [ 5. واجهات ImGui (تصميم الخدود الطويلة + الدخول المباشر) ]
 // ==========================================
 void ShowUI() {
-    // تصميم طولي (خدود طويلة) مع حجم كبير متناسق
+    // تصميم طولي مع حجم كبير متناسق
     ImGui::SetNextWindowSize(ImVec2(550, 950), ImGuiCond_FirstUseEver);
     
     if (g_State == LOGIN || g_State == ACTIVATING) {
         ImGui::Begin("WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
+        
         if (g_State == LOGIN) {
-            static char k[64] = "";
-            ImGui::Text("Enter Activation Key:");
-            ImGui::InputText("##key", k, 64);
+            ImGui::TextColored(ImVec4(0, 1, 0, 1), "System Ready for Injection!");
             ImGui::Spacing();
-            if (ImGui::Button("ACTIVATE MOD", ImVec2(-1, 80))) {
-                login_process([NSString stringWithUTF8String:k]);
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            
+            // زر الدخول المباشر لتخطي مشكلة الكيبورد مؤقتاً
+            if (ImGui::Button("AUTO LOGIN (TEST) 🚀", ImVec2(-1, 90))) {
+                g_User.key = @"WESSAM-TEST";
+                g_User.type = @"VIP Developer";
+                g_User.startDate = @"Today";
+                g_User.endDate = @"Forever";
+                g_State = SUCCESS_CARD;
             }
+            ImGui::Spacing();
+            ImGui::TextWrapped("Note: Press the button above to bypass the keyboard and enter the menu directly.");
+
         } else {
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "Connecting to Server...");
             ImGui::Text("Please wait...");
@@ -148,7 +128,8 @@ void ShowUI() {
         ImGui::Text("Start: %s", [g_User.startDate UTF8String]);
         ImGui::Text("End: %s", [g_User.endDate UTF8String]);
         ImGui::Separator();
-        if (ImGui::Button("ENTER MAIN MENU", ImVec2(-1, 80))) {
+        
+        if (ImGui::Button("ENTER MAIN MENU 🎮", ImVec2(-1, 90))) {
             g_State = MAIN_MENU;
         }
         ImGui::End();
@@ -157,18 +138,22 @@ void ShowUI() {
         ImGui::Begin("WESSAM MOD PANEL", &showMenu);
         if (ImGui::BeginTabBar("Tabs")) {
             if (ImGui::BeginTabItem("ESP (Radar)")) {
-                ImGui::Checkbox("Enable ESP Boxes", &radarBox);
+                ImGui::Spacing();
+                ImGui::Checkbox(" Enable ESP Boxes", &radarBox);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Aimbot")) {
-                ImGui::Checkbox("Enable Magic Bullet", &aimbot);
-                if (ImGui::Checkbox("Enable No Recoil", &noRecoil)) {
+                ImGui::Spacing();
+                ImGui::Checkbox(" Enable Magic Bullet", &aimbot);
+                ImGui::Spacing();
+                if (ImGui::Checkbox(" Enable No Recoil", &noRecoil)) {
                     uintptr_t addr = get_base(NULL) + Offsets::Recoil;
                     patch_memory(addr, noRecoil ? @"00 00 00 00" : @"00 00 A0 41");
                 }
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Server Bypass")) {
+                ImGui::Spacing();
                 ImGui::TextColored(ImVec4(0, 1, 0, 1), "Injected Online Bypasses:");
                 if (g_OnlineBypass) {
                     for (NSDictionary *item in g_OnlineBypass) {
@@ -211,7 +196,7 @@ void ShowUI() {
         ImGui::CreateContext();
         ImGui_ImplMetal_Init(self.mtkView.device);
         
-        // التكبير الإجباري لشاشات الريتنا!
+        // التكبير الإجباري لشاشات الريتنا! (الخط والأزرار)
         ImGuiIO& io = ImGui::GetIO();
         io.FontGlobalScale = 2.5f; 
         ImGui::GetStyle().ScaleAllSizes(2.5f);
