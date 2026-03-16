@@ -7,16 +7,13 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 1. الأوفستات الأساسية (تحديث أحمد - السيزن الجديد) ]
+// [ 1. الأوفستات الشاملة (سيزن جديد) ]
 // ==========================================
-namespace ServerConfig {
-    NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
-    NSString *OffsetsJSON = @"http://34.204.178.160/manager/offsets.json";
-}
-
 namespace Global {
     uintptr_t GWorld_Func = 0x102A62208;
     uintptr_t GWorld_Data = 0x10A566E00;
+    uintptr_t GName_Func  = 0x104bd8740;
+    uintptr_t GName_Data  = 0x10a1178b0;
 }
 
 namespace Offsets {
@@ -24,41 +21,58 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
-    int Ptr1 = 0x38;
-    int Ptr2 = 0x78;
-    int Ptr3 = 0x30;
+    int Ptr1 = 0x38; int Ptr2 = 0x78; int Ptr3 = 0x30;
     
-    // أوفستات أحمد الذهبية 🔥
     int CameraManager = 0x548;
-    int CameraPOV = 0x10a0 + 0x10; // PovOffset + 10
-    int SelfActor = 0x28d0;        // SelfOffset
+    int CameraPOV = 0x10b0; 
+    int SelfActor = 0x28d0;        
     
-    int RootComponent = 0x110;     // MoveCoordOffset
-    int RelativeLocation = 0x208;  // CoordOffset
+    // إحداثيات اللاعب
+    int RootComponent = 0x110;     
+    int RelativeLocation = 0x208;  
+    int Mesh = 0x510;              
     
-    int Mesh = 0x510;              // MeshOffset
-    int Health = 0xe60;            // HpOffset
-    int HealthMax = 0xe64;         // HpMaxOffset
-    int IsDead = 0xe7c;            // isDaed
+    // معلومات اللاعب
+    int Health = 0xe60;            
+    int HealthMax = 0xe64;         
+    int IsDead = 0xe7c;            
+    int IsBot = 0xa59;             // RobotOffset
+    int TeamID = 0x998;            // TeamOffset
+    int Name = 0x960;              // NameOffset
     
-    int CurrentWeapon = 0x2a60;    // WeaponOneOffset
-    int WeaponAttr = 0x1360;       // WeaponAttrOffset
-    int Recoil = 0xcf0;            // RecoilOffset
+    // المركبات
+    int VehicleComponent = 0xc00;  // VehicleCommonComponentOffset
+    
+    // الأسلحة والذاكرة
+    int CurrentWeapon = 0x2a60;    
+    int WeaponAttr = 0x1360;       
+    int Recoil = 0xcf0;            
+    int BulletSpeed = 0x560;
 }
 
-enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
-ModState g_State = LOGIN;
 bool showMenu = true; 
 bool imguiInitialized = false; 
 
-struct UserData { NSString *key; NSString *type; } g_User;
+// ==========================================
+// [ متغيرات التفعيلات (أزرار المنيو) ]
+// ==========================================
+// ESP Player
+bool espBox = false; 
+bool espLines = false;
+bool espHealth = false;
+bool espDistance = false;
+bool espName = false;
+bool espBotInfo = false;
+bool espSkeleton = false;
 
-// أزرار المنيو اللي تمت برمجتها
-bool radarBox = false; 
-bool radarLines = false;
-bool radarHealth = false;
-bool aimbot = false; 
+// ESP Vehicles & Loot
+bool espVehicles = false;
+bool espLoot = false;
+
+// Memory Hacks
 bool noRecoil = false; 
+bool magicBullet = false; 
+bool instHit = false;
 
 // ==========================================
 // [ 2. محرك قراءة وكتابة الذاكرة ]
@@ -121,8 +135,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
-    float safeFov = 90.0f; // إجبار الـ FOV لحماية الرسم
-    
+    float safeFov = 90.0f; 
     ImVec2 screenCoord;
     float fovCalc = screenCenter.x / tanf(safeFov * ((float) M_PI / 360.0f));
     screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
@@ -131,7 +144,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار والهاك (ESP & Memory) ]
+// [ 4. محرك الرادار الشامل ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
@@ -146,19 +159,16 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
     uintptr_t selfActor = ReadMem<uintptr_t>(playerController + Offsets::SelfActor);
 
-    // 🔥 ميزة ثبات السلاح (No Recoil) مبرمجة على أوفستات أحمد 🔥
+    // 🔥 تفعيلات الذاكرة 🔥
     if (noRecoil && selfActor) {
         uintptr_t currentWeapon = ReadMem<uintptr_t>(selfActor + Offsets::CurrentWeapon);
         if (currentWeapon) {
             uintptr_t weaponAttr = ReadMem<uintptr_t>(currentWeapon + Offsets::WeaponAttr);
-            if (weaponAttr) {
-                // تصفير الارتداد بالكامل
-                WriteMem<float>(weaponAttr + Offsets::Recoil, 0.0f);
-            }
+            if (weaponAttr) WriteMem<float>(weaponAttr + Offsets::Recoil, 0.0f);
         }
     }
 
-    if (!radarBox && !radarLines && !radarHealth) return;
+    if (!espBox && !espLines && !espHealth && !espDistance && !espVehicles) return;
 
     uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
     if (!uLevel) return;
@@ -173,117 +183,183 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (actorCount < 1 || actorCount > 5000) return;
     
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
-    int drawnCount = 0; 
 
-    // 🔥 حلقة فلترة اللاعبين الحقيقيين فقط 🔥
     for (int i = 0; i < actorCount; i++) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
         if (!actor || actor == selfActor) continue; 
 
-        // 1. فلتر الموت والدم (لن نرسم على سيارة أو شجرة)
-        float hp = ReadMem<float>(actor + Offsets::Health);
-        bool isDead = ReadMem<bool>(actor + Offsets::IsDead);
+        // التحقق هل هو لاعب أم سيارة
+        uintptr_t mesh = ReadMem<uintptr_t>(actor + Offsets::Mesh);
+        uintptr_t vehicleComp = ReadMem<uintptr_t>(actor + Offsets::VehicleComponent);
         
-        if (isDead || hp <= 0.0f || hp > 150.0f) continue; // إذا ميت أو دمه مو طبيعي، تجاهل!
+        bool isPlayer = (mesh != 0 && vehicleComp == 0);
+        bool isVehicle = (vehicleComp != 0);
 
-        // 2. قراءة الموقع بإحداثيات أحمد
+        if (!isPlayer && !isVehicle) continue;
+
+        if (isPlayer) {
+            float hp = ReadMem<float>(actor + Offsets::Health);
+            bool isDead = ReadMem<bool>(actor + Offsets::IsDead);
+            if (isDead || hp <= 0.0f || hp > 150.0f) continue; 
+        }
+
         uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
         if (!rootComponent) continue;
         ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
         
+        if (actorLocation.x == 0 && actorLocation.y == 0) continue;
+        
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
         if (screenPos.x > -100 && screenPos.y > -100 && screenPos.x < screenSize.x + 100) {
+            float distanceRaw = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2)) / 100.0f;
+            if (distanceRaw < 1.0f || distanceRaw > 800.0f) continue;
             
-            float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2)) / 100.0f;
-            if (distance < 1.0f || distance > 800.0f) continue;
+            int distance = (int)distanceRaw;
+            float boxWidth = (isVehicle ? 1200.0f : 800.0f) / distanceRaw;
+            float boxHeight = (isVehicle ? 800.0f : 1600.0f) / distanceRaw;
             
-            float boxWidth = 800.0f / distance;
-            float boxHeight = 1600.0f / distance;
-            
-            // زر المربع
-            if (radarBox) {
+            ImU32 boxColor = isVehicle ? IM_COL32(255, 165, 0, 255) : IM_COL32(255, 0, 0, 255); // برتقالي للسيارة، أحمر للاعب
+
+            // رسم المربع
+            if ((isPlayer && espBox) || (isVehicle && espVehicles)) {
                 draw->AddRect(ImVec2(screenPos.x - (boxWidth / 2), screenPos.y - boxHeight), 
                               ImVec2(screenPos.x + (boxWidth / 2), screenPos.y), 
-                              IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
+                              boxColor, 0, 0, 1.5f);
             }
             
-            // زر الخطوط
-            if (radarLines) {
-                draw->AddLine(ImVec2(screenCenter.x, 80), // من أعلى الشاشة للعدو
+            // رسم الخط
+            if ((isPlayer && espLines) || (isVehicle && espVehicles)) {
+                draw->AddLine(ImVec2(screenCenter.x, 80), 
                               ImVec2(screenPos.x, screenPos.y - boxHeight), 
-                              IM_COL32(255, 255, 255, 200), 1.0f);
+                              IM_COL32(255, 255, 255, 150), 1.0f);
             }
 
-            // زر الدم
-            if (radarHealth) {
-                float hpMax = ReadMem<float>(actor + Offsets::HealthMax);
-                if (hpMax <= 0) hpMax = 100.0f;
-                float hpPercent = hp / hpMax;
+            if (isPlayer) {
+                // رسم الدم
+                if (espHealth) {
+                    float hp = ReadMem<float>(actor + Offsets::Health);
+                    float hpPercent = hp / 100.0f;
+                    draw->AddRectFilled(ImVec2(screenPos.x - (boxWidth / 2) - 6, screenPos.y - boxHeight), 
+                                        ImVec2(screenPos.x - (boxWidth / 2) - 2, screenPos.y), 
+                                        IM_COL32(0, 0, 0, 150));
+                    draw->AddRectFilled(ImVec2(screenPos.x - (boxWidth / 2) - 6, screenPos.y - (boxHeight * hpPercent)), 
+                                        ImVec2(screenPos.x - (boxWidth / 2) - 2, screenPos.y), 
+                                        IM_COL32(0, 255, 0, 255));
+                }
                 
-                draw->AddRectFilled(ImVec2(screenPos.x - (boxWidth / 2) - 6, screenPos.y - boxHeight), 
-                                    ImVec2(screenPos.x - (boxWidth / 2) - 2, screenPos.y), 
-                                    IM_COL32(0, 0, 0, 150));
-                draw->AddRectFilled(ImVec2(screenPos.x - (boxWidth / 2) - 6, screenPos.y - (boxHeight * hpPercent)), 
-                                    ImVec2(screenPos.x - (boxWidth / 2) - 2, screenPos.y), 
-                                    IM_COL32(0, 255, 0, 255));
+                // رسم المسافة ومعلومات البوت
+                char infoText[64] = "";
+                if (espDistance) sprintf(infoText, "%dm", distance);
+                
+                if (espBotInfo) {
+                    bool isBot = ReadMem<bool>(actor + Offsets::IsBot);
+                    if (isBot) strcat(infoText, " [BOT]");
+                    else strcat(infoText, " [PLAYER]");
+                }
+                
+                if (espDistance || espBotInfo) {
+                    ImVec2 textSize = ImGui::CalcTextSize(infoText);
+                    draw->AddText(ImVec2(screenPos.x - (textSize.x / 2), screenPos.y - boxHeight - 20), IM_COL32(0, 255, 255, 255), infoText);
+                }
             }
-            drawnCount++;
         }
     }
-    
-    char debugText[256];
-    sprintf(debugText, "Actors: %d | Enemies Drawn: %d | Ahmed Offsets Linked!", actorCount, drawnCount);
-    draw->AddText(ImVec2(screenSize.x / 2 - 150, 80), IM_COL32(0, 255, 0, 255), debugText);
 }
 
 // ==========================================
-// [ 5. واجهات ImGui ]
+// [ دالة مساعدة للزر الكلاسيكي ON / OFF ]
+// ==========================================
+static void DrawClassicToggle(const char* name, bool* value) {
+    ImGui::Text("%s", name);
+    ImGui::NextColumn();
+    ImGui::PushID(name);
+    if (*value) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 1.0f, 0.2f, 1.0f)); 
+        if (ImGui::Selectable("ON", false)) *value = false;
+        ImGui::PopStyleColor();
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.2f, 0.2f, 1.0f)); 
+        if (ImGui::Selectable("OFF", false)) *value = true;
+        ImGui::PopStyleColor();
+    }
+    ImGui::PopID();
+    ImGui::NextColumn();
+}
+
+// ==========================================
+// [ 5. واجهة ImGui (مقسمة ومرتبة VIP) ]
 // ==========================================
 void ShowUI() {
-    ImGui::SetNextWindowSize(ImVec2(600, 450), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(550, 480), ImGuiCond_FirstUseEver);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.05f, 0.05f, 0.05f, 0.90f)); 
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); 
     
-    if (g_State == LOGIN) {
-        ImGui::Begin("WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
-        ImGui::TextColored(ImVec4(0, 1, 0, 1), "Ahmed Offsets Active! 🔥");
-        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
-        if (ImGui::Button("AUTO LOGIN (TEST) 🚀", ImVec2(-1, 90))) {
-            g_User.key = @"WESSAM-TEST";
-            g_User.type = @"VIP Developer";
-            g_State = SUCCESS_CARD;
+    ImGui::Begin("ClassicMenu", &showMenu, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    
+    // عنوان المنيو
+    ImGui::TextColored(ImVec4(0, 1, 1, 1), "WESSAM CYBER - VIP PANEL");
+    ImGui::Separator(); ImGui::Spacing();
+    
+    if (ImGui::BeginTabBar("Tabs")) {
+        
+        // ------------------ قسم رادار اللاعبين ------------------
+        if (ImGui::BeginTabItem("ESP Player")) {
+            ImGui::Spacing();
+            ImGui::Columns(2, "esp_opts", false);
+            ImGui::SetColumnWidth(0, 350.0f); 
+            
+            DrawClassicToggle("Draw ESP Boxes (مربعات)", &espBox);
+            DrawClassicToggle("Draw ESP Lines (خطوط)", &espLines);
+            DrawClassicToggle("Draw Health Bar (شريط الدم)", &espHealth);
+            DrawClassicToggle("Draw Distance (المسافة)", &espDistance);
+            DrawClassicToggle("Bot / Player Info (كشف البوت)", &espBotInfo);
+            DrawClassicToggle("Draw Skeleton (العظام - قريباً)", &espSkeleton);
+            DrawClassicToggle("Draw Names (الأسماء - قريباً)", &espName);
+            
+            ImGui::Columns(1);
+            ImGui::EndTabItem();
         }
-        ImGui::End();
-    } 
-    else if (g_State == SUCCESS_CARD) {
-        ImGui::Begin("SUCCESS", &showMenu, ImGuiWindowFlags_NoCollapse);
-        ImGui::TextColored(ImVec4(0, 1, 0, 1), "Mod Activated Successfully!");
-        ImGui::Separator();
-        if (ImGui::Button("ENTER MAIN MENU 🎮", ImVec2(-1, 90))) g_State = MAIN_MENU;
-        ImGui::End();
-    } 
-    else if (g_State == MAIN_MENU) {
-        ImGui::Begin("WESSAM MOD PANEL", &showMenu);
-        if (ImGui::BeginTabBar("Tabs")) {
-            if (ImGui::BeginTabItem("ESP (Radar)")) {
-                ImGui::Spacing(); 
-                ImGui::Checkbox(" Enable ESP Boxes (مربعات)", &radarBox); 
-                ImGui::Spacing();
-                ImGui::Checkbox(" Enable ESP Lines (خطوط)", &radarLines);
-                ImGui::Spacing();
-                ImGui::Checkbox(" Enable ESP Health (شريط الدم)", &radarHealth);
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Memory Hacks")) {
-                ImGui::Spacing(); 
-                ImGui::Checkbox(" Enable No Recoil (ثبات السلاح 100%)", &noRecoil); 
-                ImGui::Spacing();
-                ImGui::Checkbox(" Enable Magic Bullet", &aimbot); 
-                ImGui::EndTabItem();
-            }
-            ImGui::EndTabBar();
+        
+        // ------------------ قسم رادار المركبات ------------------
+        if (ImGui::BeginTabItem("ESP World")) {
+            ImGui::Spacing();
+            ImGui::Columns(2, "world_opts", false);
+            ImGui::SetColumnWidth(0, 350.0f);
+            
+            DrawClassicToggle("Draw Vehicles (كشف السيارات)", &espVehicles);
+            DrawClassicToggle("Draw Loot (الأسلحة - قريباً)", &espLoot);
+            
+            ImGui::Columns(1);
+            ImGui::EndTabItem();
         }
-        ImGui::End();
+        
+        // ------------------ قسم الذاكرة والماجيك ------------------
+        if (ImGui::BeginTabItem("Memory & Aimbot")) {
+            ImGui::Spacing();
+            ImGui::Columns(2, "mem_opts", false);
+            ImGui::SetColumnWidth(0, 350.0f);
+            
+            DrawClassicToggle("No Recoil 100% (ثبات السلاح)", &noRecoil);
+            DrawClassicToggle("Magic Bullet (توجيه الرصاص)", &magicBullet);
+            DrawClassicToggle("Instant Hit (سرعة الطلقة)", &instHit);
+            
+            ImGui::Columns(1);
+            ImGui::EndTabItem();
+        }
+        
+        ImGui::EndTabBar();
     }
+    
+    ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+    if (ImGui::Selectable("<- Hide Menu (Tap 3 fingers to open)")) {
+        showMenu = false;
+    }
+    ImGui::PopStyleColor();
+    
+    ImGui::End();
+    ImGui::PopStyleColor(2); 
 }
 
 // ==========================================
@@ -342,7 +418,6 @@ void ShowUI() {
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
 
 - (void)drawInMTKView:(MTKView *)view {
-    if (!showMenu && !radarBox && !radarLines && !radarHealth && !noRecoil) return;
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
     MTLRenderPassDescriptor *desc = view.currentRenderPassDescriptor;
