@@ -20,7 +20,8 @@ jobs:
 
       - name: Setup Theos (بيئة البناء)
         run: |
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          # تنزيل Theos برابط مباشر من المستودع لتخطي أخطاء الـ API
+          git clone --recursive https://github.com/theos/theos.git ~/theos
           echo "THEOS=~/theos" >> $GITHUB_ENV
 
       - name: Setup iOS SDKs (مكاتب أبل)
@@ -28,19 +29,6 @@ jobs:
           curl -LO https://github.com/theos/sdks/archive/master.zip
           unzip -q master.zip
           cp -R sdks-master/* ~/theos/sdks/
-         
-          
-          
-          
-                - name: Setup Theos (بيئة البناء)
-        run: |
-          # تنزيل Theos برابط مباشر من المستودع بدلاً من السكربت الرسمي
-          git clone --recursive https://github.com/theos/theos.git ~/theos
-          echo "THEOS=~/theos" >> $GITHUB_ENV
-          
-          
-          
-          
           rm -rf master.zip sdks-master
 
       - name: Fetch ImGui Library (جلب ملفات الرسم الناقصة)
@@ -61,4 +49,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: WessamMod-Dylib-Ready
-          path: .theos/obj/**/*.dylib 
+          path: .theos/obj/**/*.dylib
+          
