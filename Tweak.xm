@@ -7,7 +7,7 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 1. الأوفستات الأساسية الآمنة ]
+// [ 1. الأوفستات الأساسية ]
 // ==========================================
 namespace ServerConfig {
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
@@ -29,10 +29,12 @@ namespace Offsets {
     int Ptr3 = 0x30;
     int CameraManager = 0x548;
     
-    // أوفستات قياسية ومستقرة لببجي 3.1 (بدون احتمالات)
-    int CameraCache = 0x10b0; 
-    int RootComponent = 0x158; 
-    int RelativeLocation = 0x120; 
+    // 🔥 رجعنا لكاميرا Dolphins الأصلية 🔥
+    int CameraPOV = 0x10b0; 
+    
+    // 🔥 أوفستات مسعود لموقع العدو (من ملف Dolphins) 🔥
+    int RootComponent = 0x2c0; // MoveCoordOffset
+    int RelativeLocation = 0x208; // CoordOffset
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -42,12 +44,11 @@ bool imguiInitialized = false;
 
 struct UserData { NSString *key; NSString *type; } g_User;
 
-// 🔥 تم إطفاء كل شيء افتراضياً لتجنب الكراش 🔥
 bool radarBox = false; 
 bool aimbot = false; 
 
 // ==========================================
-// [ 2. محرك قراءة الذاكرة الآمن ]
+// [ 2. محرك قراءة الذاكرة (الآمن) ]
 // ==========================================
 uintptr_t get_base(const char* module) {
     if(!module) return (uintptr_t)_dyld_get_image_header(0);
@@ -60,7 +61,7 @@ uintptr_t get_base(const char* module) {
 
 template <typename T>
 T ReadMem(uintptr_t address) {
-    // حماية قوية جداً من الكراش (التأكد من أن العنوان صالح)
+    // حماية قصوى: لا تقرأ إذا العنوان فارغ أو خارج نطاق الذاكرة الصحيح
     if (address > 0x100000000 && address < 0x2000000000) {
         return *(T*)address;
     }
@@ -105,7 +106,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
-    // إجبار دائم للـ FOV لحماية اللعبة من الكراش الرياضي
+    // إجبار دائم لحماية الرياضيات من الكراش
     float safeFov = 90.0f; 
     
     ImVec2 screenCoord;
@@ -116,10 +117,10 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop المستقر) ]
+// [ 4. محرك الرادار (المستقر + أوفستات دولفينز) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
-    if (!radarBox) return; // لن يعمل إلا إذا فعلته بنفسك من المنيو
+    if (!radarBox) return;
 
     uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
     typedef uintptr_t (*GWorldFn)(uintptr_t);
@@ -137,16 +138,15 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     
     if (!cameraManager) return;
 
-    // 🔥 قراءة الكاميرا القياسية والآمنة 100% 🔥
     MinimalViewInfo pov;
-    pov.location = ReadMem<ImVec3>(cameraManager + Offsets::CameraCache + 0x0);
-    pov.rotation = ReadMem<ImVec3>(cameraManager + Offsets::CameraCache + 0xC); // الزاوية القياسية
+    // قراءة الكاميرا بترتيب ملفك القديم (0x0 موقع، 0x18 زاوية)
+    pov.location = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV + 0x0);
+    pov.rotation = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV + 0x18); 
     pov.fov = 90.0f; 
 
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
     int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
     
-    // حماية إضافية للعدد
     if (actorCount < 1 || actorCount > 5000) return;
     
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
@@ -156,18 +156,30 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
         if (!actor) continue;
 
+        // قراءة الروت الخاص بملفك القديم 0x2c0
         uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
-        if (!rootComponent) continue;
+        if (!rootComponent) {
+            // إذا فشل الـ 0x2c0، جرب 0x158 (القياسي) بأمان
+            rootComponent = ReadMem<uintptr_t>(actor + 0x158);
+            if (!rootComponent) continue;
+        }
         
+        // قراءة الموقع الخاص بملفك القديم 0x208
         ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
         
-        // تجاهل الإحداثيات الخاطئة
+        // إذا فشل الـ 0x208، جرب 0x120 (القياسي) بأمان
+        if (actorLocation.x == 0 && actorLocation.y == 0) {
+            actorLocation = ReadMem<ImVec3>(rootComponent + 0x120);
+        }
+        
+        // التحقق النهائي من صحة الإحداثيات
         if (actorLocation.x == 0 && actorLocation.y == 0) continue;
         if (actorLocation.x > 1000000 || actorLocation.x < -1000000) continue; 
         
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
-        if (screenPos.x > -100 && screenPos.y > -100 && screenPos.x < screenSize.x + 100) {
+        // الرسم
+        if (screenPos.x > -200 && screenPos.y > -200 && screenPos.x < screenSize.x + 200) {
             draw->AddRect(ImVec2(screenPos.x - 20, screenPos.y - 40), 
                           ImVec2(screenPos.x + 20, screenPos.y + 40), 
                           IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
@@ -178,10 +190,9 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         }
     }
     
-    // شاشة المراقبة 
     char debugText[256];
-    sprintf(debugText, "Actors: %d | Drawn: %d | System Stable!", actorCount, drawnCount);
-    draw->AddText(ImVec2(screenSize.x / 2 - 100, 80), IM_COL32(0, 255, 0, 255), debugText);
+    sprintf(debugText, "Actors: %d | Drawn: %d | Cam Z: %.1f", actorCount, drawnCount, pov.location.z);
+    draw->AddText(ImVec2(screenSize.x / 2 - 150, 80), IM_COL32(0, 255, 0, 255), debugText);
 }
 
 // ==========================================
@@ -294,7 +305,6 @@ void ShowUI() {
 
     if (showMenu) ShowUI();
     
-    // الرادار يشتغل فقط إذا فعلته أنت
     if (radarBox) {
         ImDrawList* draw = ImGui::GetBackgroundDrawList();
         DrawESP(draw, io.DisplaySize);
