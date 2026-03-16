@@ -151,7 +151,9 @@ void ShowUI() {
 // [ 4. محرك الرسم ]
 // ==========================================
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
+
 - (void)drawInMTKView:(MTKView *)view {
+    // إذا المنيو مخفي والرادار مطفي، لا ترسم أي شيء (لتوفير البطارية)
     if (!showMenu && !radarBox) return;
 
     ImGuiIO& io = ImGui::GetIO();
@@ -164,24 +166,28 @@ void ShowUI() {
     ImGui_ImplMetal_NewFrame(desc);
     ImGui::NewFrame();
 
+    // ---------------------------------------------------
+    // 🔥 هذا هو الكود اللي سألت عنه مكانه هنا بالضبط 🔥
+    
+    // استدعاء واجهة المنيو
     if (showMenu) ShowUI();
     
-    // المربع التجريبي للرادار
+    // استدعاء محرك الرادار (ESP)
     if (radarBox) {
         ImDrawList* draw = ImGui::GetBackgroundDrawList();
-        float cx = io.DisplaySize.x / 2.0f;
-        float cy = io.DisplaySize.y / 2.0f;
-        draw->AddRect(ImVec2(cx - 50, cy - 100), ImVec2(cx + 50, cy + 100), IM_COL32(255,0,0,255), 0.0f, 0, 3.0f);
-        draw->AddText(ImVec2(cx - 30, cy - 120), IM_COL32(0,255,0,255), "Enemy (Test)");
+        DrawESP(draw, io.DisplaySize); // إرسال قلم الرسم وأبعاد الشاشة لمحرك الرادار
     }
 
     ImGui::Render();
+    // ---------------------------------------------------
+
     id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
     ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), buffer, encoder);
     [encoder endEncoding];
     [buffer presentDrawable:view.currentDrawable];
     [buffer commit];
 }
+
 @end
 
 // ==========================================
@@ -286,4 +292,56 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     
     return screenCoord;
 }
+
+
+
+// ==========================================
+// [ 7. محرك قراءة الذاكرة الآمن (Memory Reader) ]
+// ==========================================
+// دالة تقرأ الذاكرة بأمان وبدون ما تكرش اللعبة إذا العنوان فارغ
+template <typename T>
+T ReadMem(uintptr_t address) {
+    if (address > 0x100000000 && address < 0x2000000000) {
+        return *(T*)address;
+    }
+    return T{};
+}
+
+// ==========================================
+// [ 8. محرك الرادار (ESP Loop - فحص النبض) ]
+// ==========================================
+void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
+    if (!radarBox) return;
+
+    // 1. قراءة الـ Base Address (عنوان اللعبة الرئيسي)
+    uintptr_t baseAddr = get_base(NULL); 
+    
+    // 2. قراءة عالم اللعبة GWorld
+    uintptr_t gWorld = ReadMem<uintptr_t>(baseAddr + Global::GWorld);
+    if (!gWorld) {
+        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "GWorld Not Found!");
+        return;
+    }
+
+    // 3. قراءة المرحلة الحالية ULevel
+    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
+    if (!uLevel) {
+        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "ULevel Not Found!");
+        return;
+    }
+
+    // 4. قراءة مصفوفة اللاعبين وعددهم (ActorArray & ActorCount)
+    uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
+    int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
+
+    // 5. طباعة النتيجة على الشاشة (للتأكد من الاختراق)
+    char infoText[256];
+    sprintf(infoText, "[+] Memory Hooked! Actors Count: %d", actorCount);
+    
+    draw->AddText(ImVec2(screenSize.x / 2 - 130, 80), IM_COL32(0, 255, 0, 255), infoText);
+    
+    // رسم مربع صغير للتأكد من جاهزية أداة الرسم
+    draw->AddRect(ImVec2(screenSize.x / 2 - 50, 120), ImVec2(screenSize.x / 2 + 50, 220), IM_COL32(255, 255, 0, 255), 0, 0, 2.0f);
+}
+
 
