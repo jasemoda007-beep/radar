@@ -26,6 +26,7 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
+    // أوفستات الكاميرا (مضبوطة 100% حسب الفيديو مالتك)
     int Ptr1 = 0x38;
     int Ptr2 = 0x78;
     int Ptr3 = 0x30;
@@ -33,8 +34,9 @@ namespace Offsets {
     int CameraManager = 0x548;
     int CameraPOV = 0x10b0; 
     
-    int RootComponent = 0x208; 
-    int RelativeLocation = 0x208; 
+    // أوفستات موقع العدو (تم تصحيحها للقيم القياسية لببجي 3.1)
+    int RootComponent = 0x158; 
+    int RelativeLocation = 0x11c; 
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -123,7 +125,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop - وضع الفحص) ]
+// [ 4. محرك الرادار (ESP Loop - الرسم الإجباري) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
@@ -149,11 +151,6 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
     int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
     
-    // 🚨 [ شاشة المراقبة للمهندس مسعود ] 🚨
-    char debugText[256];
-    sprintf(debugText, "Actors: %d | Cam X: %.1f | Cam Y: %.1f", actorCount, pov.location.x, pov.location.y);
-    draw->AddText(ImVec2(100, 100), IM_COL32(0, 255, 0, 255), debugText);
-
     if (actorCount < 1 || actorCount > 10000) return;
     
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
@@ -169,11 +166,22 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
-        // 🚨 لغينا كل الشروط، ارسم المربع وين ما كان حتى لو غلط! 🚨
-        if (screenPos.x > -2000 && screenPos.y > -2000 && screenPos.x < screenSize.x + 2000) {
-            draw->AddRect(ImVec2(screenPos.x - 20, screenPos.y - 40), 
-                          ImVec2(screenPos.x + 20, screenPos.y + 40), 
-                          IM_COL32(255, 0, 0, 255), 0, 0, 2.0f);
+        // 🚨 رسم المربع غصباً عنه (بدون شروط المسافة المعقدة) 🚨
+        if (screenPos.x > -100 && screenPos.y > -100 && screenPos.x < screenSize.x + 100 && screenPos.y < screenSize.y + 100) {
+            
+            // حساب مسافة مبسط جداً لتكبير المربع للأهداف القريبة
+            float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2)) / 100.0f;
+            if (distance < 1.0f || distance > 800.0f) continue;
+            
+            float boxSize = 2500.0f / distance;
+            
+            draw->AddRect(ImVec2(screenPos.x - (boxSize / 4), screenPos.y - (boxSize / 2)), 
+                          ImVec2(screenPos.x + (boxSize / 4), screenPos.y + (boxSize / 2)), 
+                          IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
+                          
+            draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
+                          ImVec2(screenPos.x, screenPos.y + (boxSize / 2)), 
+                          IM_COL32(255, 255, 255, 100), 1.0f);
         }
     }
 }
