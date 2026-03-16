@@ -26,7 +26,6 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
-    // أوفستات الكاميرا (مضبوطة 100% حسب الفيديو مالتك)
     int Ptr1 = 0x38;
     int Ptr2 = 0x78;
     int Ptr3 = 0x30;
@@ -34,9 +33,9 @@ namespace Offsets {
     int CameraManager = 0x548;
     int CameraPOV = 0x10b0; 
     
-    // أوفستات موقع العدو (تم تصحيحها للقيم القياسية لببجي 3.1)
-    int RootComponent = 0x158; 
-    int RelativeLocation = 0x11c; 
+    // 🔥 تم إرجاع أوفستات مسعود القديمة 0x208 🔥
+    int RootComponent = 0x208; 
+    int RelativeLocation = 0x208; 
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -117,6 +116,9 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
+    // 🔥 حماية من القسمة على صفر (تمنع الكراش واختفاء المربعات) 🔥
+    if (camViewInfo.fov <= 0.0f || camViewInfo.fov > 180.0f) camViewInfo.fov = 90.0f; 
+    
     ImVec2 screenCoord;
     float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
     screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
@@ -125,7 +127,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop - الرسم الإجباري) ]
+// [ 4. محرك الرادار (ESP Loop - وضع الديباك) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
@@ -154,6 +156,7 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (actorCount < 1 || actorCount > 10000) return;
     
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
+    int drawnCount = 0; // عداد المربعات المرسومة
 
     for (int i = 0; i < actorCount; i++) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
@@ -164,26 +167,28 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         
         ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
         
+        // 🔥 تجاهل الإحداثيات الصفرية (تمنع رسم المربعات بالهواء) 🔥
+        if (actorLocation.x == 0 && actorLocation.y == 0 && actorLocation.z == 0) continue;
+        
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
-        // 🚨 رسم المربع غصباً عنه (بدون شروط المسافة المعقدة) 🚨
-        if (screenPos.x > -100 && screenPos.y > -100 && screenPos.x < screenSize.x + 100 && screenPos.y < screenSize.y + 100) {
+        // رسم المربع غصباً عنه إذا كان ضمن الشاشة
+        if (screenPos.x > -500 && screenPos.y > -500 && screenPos.x < screenSize.x + 500) {
+            draw->AddRect(ImVec2(screenPos.x - 25, screenPos.y - 50), 
+                          ImVec2(screenPos.x + 25, screenPos.y + 50), 
+                          IM_COL32(255, 0, 0, 255), 0, 0, 2.0f);
             
-            // حساب مسافة مبسط جداً لتكبير المربع للأهداف القريبة
-            float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2)) / 100.0f;
-            if (distance < 1.0f || distance > 800.0f) continue;
-            
-            float boxSize = 2500.0f / distance;
-            
-            draw->AddRect(ImVec2(screenPos.x - (boxSize / 4), screenPos.y - (boxSize / 2)), 
-                          ImVec2(screenPos.x + (boxSize / 4), screenPos.y + (boxSize / 2)), 
-                          IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
-                          
             draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
-                          ImVec2(screenPos.x, screenPos.y + (boxSize / 2)), 
+                          ImVec2(screenPos.x, screenPos.y + 50), 
                           IM_COL32(255, 255, 255, 100), 1.0f);
+            drawnCount++; // زيادة العداد
         }
     }
+    
+    // 🚨 [ شاشة المراقبة الخاصة بالمهندس مسعود ] 🚨
+    char debugText[256];
+    sprintf(debugText, "Actors: %d | Drawn: %d | FOV: %.1f", actorCount, drawnCount, pov.fov);
+    draw->AddText(ImVec2(screenSize.x / 2 - 150, 100), IM_COL32(0, 255, 0, 255), debugText);
 }
 
 // ==========================================
