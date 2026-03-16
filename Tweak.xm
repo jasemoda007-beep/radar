@@ -15,7 +15,8 @@ namespace ServerConfig {
 }
 
 namespace Global {
-    uintptr_t GWorld = 0x10A4A1960; // تأكد إن هذا الأوفست يطابق نسختك
+    uintptr_t GWorld_Func = 0x102A5125C; // دالة فك التشفير
+    uintptr_t GWorld_Data = 0x10A4A1960; // مفتاح البيانات
 }
 
 namespace Offsets {
@@ -36,6 +37,7 @@ struct UserData {
 } g_User;
 
 bool radarBox = true, aimbot = false, noRecoil = false;
+
 
 // ==========================================
 // [ 2. محرك قراءة الذاكرة (Memory Tools) ]
@@ -110,14 +112,28 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     return screenCoord;
 }
 
+
+
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop - فحص النبض) ]
+// [ 5. واجهات ImGui ]
+// ==========================================
+void ShowUI() {
+    ImGui::SetNextWindowSize(ImVec2(600, 450), ImGuiCond_FirstUseEver);
+    
+    if (g_State == LOGIN) {
+// ==========================================
+// [ 4. محرك الرادار (ESP Loop - فك التشفير) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
 
-    uintptr_t baseAddr = get_base(NULL); 
-    uintptr_t gWorld = ReadMem<uintptr_t>(baseAddr + Global::GWorld);
+    // 1. حساب الـ Slide الخاص بالذاكرة (نفس طريقة Dolphins الأصلية)
+    uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
+    
+    // 2. فك تشفير GWorld عن طريق استدعاء دالة اللعبة (gworld_func) وإعطائها (gworld_data)
+    typedef uintptr_t (*GWorldFn)(uintptr_t);
+    GWorldFn get_gworld = (GWorldFn)(slide + Global::GWorld_Func);
+    uintptr_t gWorld = get_gworld(slide + Global::GWorld_Data);
     
     if (!gWorld) {
         draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "GWorld Not Found!");
@@ -141,14 +157,6 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     // مربع تجريبي للتأكد من الرسم
     draw->AddRect(ImVec2(screenSize.x / 2 - 50, 120), ImVec2(screenSize.x / 2 + 50, 220), IM_COL32(255, 255, 0, 255), 0, 0, 2.0f);
 }
-
-// ==========================================
-// [ 5. واجهات ImGui ]
-// ==========================================
-void ShowUI() {
-    ImGui::SetNextWindowSize(ImVec2(600, 450), ImGuiCond_FirstUseEver);
-    
-    if (g_State == LOGIN) {
         ImGui::Begin("WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
         ImGui::TextColored(ImVec4(0, 1, 0, 1), "System Ready! (Dolphins Engine)");
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
