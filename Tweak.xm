@@ -215,3 +215,75 @@ static void didFinishLaunching(CFNotificationCenterRef center, void *observer, C
 __attribute__((constructor)) static void initialize() {
     CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL, &didFinishLaunching, (CFStringRef)UIApplicationDidFinishLaunchingNotification, NULL, CFNotificationSuspensionBehaviorDrop);
 }
+
+
+// ==========================================
+// [ 6. محرك الرياضيات والتحويل (W2S Engine) ]
+// ==========================================
+struct Ue4Matrix {
+    float m[4][4];
+    float* operator[](int index) { return m[index]; }
+};
+
+struct ImVec3 {
+    float x, y, z;
+    ImVec3() : x(0), y(0), z(0) {}
+    ImVec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+    ImVec3 operator-(const ImVec3& other) const { return ImVec3(x - other.x, y - other.y, z - other.z); }
+    static float Dot(const ImVec3& a, const ImVec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+};
+
+struct Ue4Rotator { float pitch, yaw, roll; };
+struct MinimalViewInfo { ImVec3 location; Ue4Rotator rotation; float fov; };
+
+// دالة تحويل زاوية الكاميرا إلى مصفوفة رياضية
+Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
+    float radPitch = rotation.pitch * ((float) M_PI / 180.0f);
+    float radYaw = rotation.yaw * ((float) M_PI / 180.0f);
+    float radRoll = rotation.roll * ((float) M_PI / 180.0f);
+    
+    float SP = sinf(radPitch); float CP = cosf(radPitch);
+    float SY = sinf(radYaw);   float CY = cosf(radYaw);
+    float SR = sinf(radRoll);  float CR = cosf(radRoll);
+    
+    Ue4Matrix matrix;
+    matrix[0][0] = (CP * CY);
+    matrix[0][1] = (CP * SY);
+    matrix[0][2] = (SP);
+    matrix[0][3] = 0;
+    
+    matrix[1][0] = (SR * SP * CY - CR * SY);
+    matrix[1][1] = (SR * SP * SY + CR * CY);
+    matrix[1][2] = (-SR * CP);
+    matrix[1][3] = 0;
+    
+    matrix[2][0] = (-(CR * SP * CY + SR * SY));
+    matrix[2][1] = (CY * SR - CR * SP * SY);
+    matrix[2][2] = (CR * CP);
+    matrix[2][3] = 0;
+    
+    matrix[3][0] = 0; matrix[3][1] = 0; matrix[3][2] = 0; matrix[3][3] = 1;
+    return matrix;
+}
+
+// دالة تحويل العالم 3D إلى الشاشة 2D
+ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 screenCenter) {
+    Ue4Matrix tempMatrix = rotatorToMatrix(camViewInfo.rotation);
+    
+    ImVec3 vAxisX(tempMatrix[0][0], tempMatrix[0][1], tempMatrix[0][2]);
+    ImVec3 vAxisY(tempMatrix[1][0], tempMatrix[1][1], tempMatrix[1][2]);
+    ImVec3 vAxisZ(tempMatrix[2][0], tempMatrix[2][1], tempMatrix[2][2]);
+    
+    ImVec3 vDelta = worldLocation - camViewInfo.location;
+    ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
+    
+    if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; // منع انقلاب الشاشة خلف الكاميرا
+    
+    ImVec2 screenCoord;
+    float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
+    screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
+    screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
+    
+    return screenCoord;
+}
+
