@@ -26,6 +26,7 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
+    // أوفستات مسعود الذهبية
     int Ptr1 = 0x38;
     int Ptr2 = 0x78;
     int Ptr3 = 0x30;
@@ -33,7 +34,6 @@ namespace Offsets {
     int CameraManager = 0x548;
     int CameraPOV = 0x10b0; 
     
-    // 🔥 تم إرجاع أوفستات مسعود القديمة 0x208 🔥
     int RootComponent = 0x208; 
     int RelativeLocation = 0x208; 
 }
@@ -51,7 +51,7 @@ struct UserData {
 bool radarBox = true, aimbot = false, noRecoil = false;
 
 // ==========================================
-// [ 2. محرك قراءة الذاكرة (Memory Tools) ]
+// [ 2. محرك قراءة الذاكرة ]
 // ==========================================
 uintptr_t get_base(const char* module) {
     if(!module) return (uintptr_t)_dyld_get_image_header(0);
@@ -71,7 +71,7 @@ T ReadMem(uintptr_t address) {
 }
 
 // ==========================================
-// [ 3. محرك الرياضيات (W2S Engine) ]
+// [ 3. محرك الرياضيات (الترتيب الجديد) ]
 // ==========================================
 struct Ue4Matrix {
     float m[4][4];
@@ -87,12 +87,25 @@ struct ImVec3 {
 };
 
 struct Ue4Rotator { float pitch, yaw, roll; };
-struct MinimalViewInfo { ImVec3 location; Ue4Rotator rotation; float fov; };
 
-Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
-    float radPitch = rotation.pitch * ((float) M_PI / 180.0f);
-    float radYaw = rotation.yaw * ((float) M_PI / 180.0f);
-    float radRoll = rotation.roll * ((float) M_PI / 180.0f);
+// 🔥 التعديل السحري: ترتيب هيكل الكاميرا الجديد لببجي 3.1 🔥
+struct MinimalViewInfo { 
+    ImVec3 location; 
+    Ue4Rotator rotation; 
+    float fov; 
+};
+
+// هيكل لقراءة الكاميرا الخام من الذاكرة (للتأكد)
+struct CameraRaw {
+    ImVec3 location;
+    ImVec3 rotation;
+    float fov;
+};
+
+Ue4Matrix rotatorToMatrix(ImVec3 rotation) {
+    float radPitch = rotation.x * ((float) M_PI / 180.0f);
+    float radYaw = rotation.y * ((float) M_PI / 180.0f);
+    float radRoll = rotation.z * ((float) M_PI / 180.0f);
     
     float SP = sinf(radPitch); float CP = cosf(radPitch);
     float SY = sinf(radYaw);   float CY = cosf(radYaw);
@@ -106,7 +119,7 @@ Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
     return matrix;
 }
 
-ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 screenCenter) {
+ImVec2 worldToScreen(ImVec3 worldLocation, CameraRaw camViewInfo, ImVec2 screenCenter) {
     Ue4Matrix tempMatrix = rotatorToMatrix(camViewInfo.rotation);
     ImVec3 vAxisX(tempMatrix[0][0], tempMatrix[0][1], tempMatrix[0][2]);
     ImVec3 vAxisY(tempMatrix[1][0], tempMatrix[1][1], tempMatrix[1][2]);
@@ -116,18 +129,18 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
-    // 🔥 حماية من القسمة على صفر (تمنع الكراش واختفاء المربعات) 🔥
-    if (camViewInfo.fov <= 0.0f || camViewInfo.fov > 180.0f) camViewInfo.fov = 90.0f; 
+    // إجبار FOV على 90 لتجنب التشوه
+    float fov = 90.0f; 
     
     ImVec2 screenCoord;
-    float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
+    float fovCalc = screenCenter.x / tanf(fov * ((float) M_PI / 360.0f));
     screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
     screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
     return screenCoord;
 }
 
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop - وضع الديباك) ]
+// [ 4. محرك الرادار (ESP Loop) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
@@ -142,21 +155,23 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
     if (!uLevel) return;
 
-    // قراءة الكاميرا
     uintptr_t ptr1 = ReadMem<uintptr_t>(gWorld + Offsets::Ptr1);
     uintptr_t ptr2 = ReadMem<uintptr_t>(ptr1 + Offsets::Ptr2);
     uintptr_t playerController = ReadMem<uintptr_t>(ptr2 + Offsets::Ptr3);
     uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
     
-    MinimalViewInfo pov = ReadMem<MinimalViewInfo>(cameraManager + Offsets::CameraPOV);
-
+    // قراءة الكاميرا الخام
+    CameraRaw pov;
+    pov.location = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV);
+    pov.rotation = ReadMem<ImVec3>(cameraManager + Offsets::CameraPOV + 0xC); // الزاوية بعد الموقع مباشرة
+    
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
     int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
     
     if (actorCount < 1 || actorCount > 10000) return;
     
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
-    int drawnCount = 0; // عداد المربعات المرسومة
+    int drawnCount = 0; 
 
     for (int i = 0; i < actorCount; i++) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
@@ -166,29 +181,25 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         if (!rootComponent) continue;
         
         ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
-        
-        // 🔥 تجاهل الإحداثيات الصفرية (تمنع رسم المربعات بالهواء) 🔥
         if (actorLocation.x == 0 && actorLocation.y == 0 && actorLocation.z == 0) continue;
         
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
-        // رسم المربع غصباً عنه إذا كان ضمن الشاشة
         if (screenPos.x > -500 && screenPos.y > -500 && screenPos.x < screenSize.x + 500) {
             draw->AddRect(ImVec2(screenPos.x - 25, screenPos.y - 50), 
                           ImVec2(screenPos.x + 25, screenPos.y + 50), 
                           IM_COL32(255, 0, 0, 255), 0, 0, 2.0f);
-            
+                          
             draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
                           ImVec2(screenPos.x, screenPos.y + 50), 
                           IM_COL32(255, 255, 255, 100), 1.0f);
-            drawnCount++; // زيادة العداد
+            drawnCount++;
         }
     }
     
-    // 🚨 [ شاشة المراقبة الخاصة بالمهندس مسعود ] 🚨
     char debugText[256];
-    sprintf(debugText, "Actors: %d | Drawn: %d | FOV: %.1f", actorCount, drawnCount, pov.fov);
-    draw->AddText(ImVec2(screenSize.x / 2 - 150, 100), IM_COL32(0, 255, 0, 255), debugText);
+    sprintf(debugText, "Actors: %d | Drawn: %d | Pitch: %.1f", actorCount, drawnCount, pov.rotation.x);
+    draw->AddText(ImVec2(screenSize.x / 2 - 150, 80), IM_COL32(0, 255, 0, 255), debugText);
 }
 
 // ==========================================
