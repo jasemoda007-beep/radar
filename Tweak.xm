@@ -171,45 +171,36 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 6. الطبقة العائمة (إصلاح الشاشة الكاملة) ]
+// [ 6. الطبقة العائمة (إصلاح الشاشة الكاملة 100%) ]
 // ==========================================
+static MTKView *g_MTKView = nil; 
+static UIView *g_Overlay = nil; // مرجع للطبقة حتى نتحكم بحجمها برمجياً
+
 @interface WessamOverlay : UIView <MTKViewDelegate>
-@property (nonatomic, strong) MTKView *mtkView;
 @property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
 @end
 
 @implementation WessamOverlay
 - (instancetype)initWithFrame:(CGRect)frame {
-    // إجبار الطبقة على أخذ أبعاد الشاشة بالعرض (Landscape)
-    CGRect fullScreen = [UIScreen mainScreen].bounds;
-    if (fullScreen.size.width < fullScreen.size.height) {
-        fullScreen = CGRectMake(0, 0, fullScreen.size.height, fullScreen.size.width);
-    }
-
-    if (self = [super initWithFrame:fullScreen]) {
+    if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
         self.userInteractionEnabled = NO;
-        
-        // التمدد التلقائي مع الشاشة
-        self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
-        self.mtkView = [[MTKView alloc] initWithFrame:self.bounds];
-        self.mtkView.device = MTLCreateSystemDefaultDevice();
-        self.mtkView.backgroundColor = [UIColor clearColor];
-        self.mtkView.clearColor = MTLClearColorMake(0, 0, 0, 0);
-        self.mtkView.delegate = self;
-        self.mtkView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [self addSubview:self.mtkView];
+        g_MTKView = [[MTKView alloc] initWithFrame:self.bounds];
+        g_MTKView.device = MTLCreateSystemDefaultDevice();
+        g_MTKView.backgroundColor = [UIColor clearColor];
+        g_MTKView.clearColor = MTLClearColorMake(0, 0, 0, 0);
+        g_MTKView.delegate = self;
+        [self addSubview:g_MTKView];
 
-        self.commandQueue = [self.mtkView.device newCommandQueue];
+        self.commandQueue = [g_MTKView.device newCommandQueue];
         
         ImGui::CreateContext();
-        ImGui_ImplMetal_Init(self.mtkView.device);
+        ImGui_ImplMetal_Init(g_MTKView.device);
         
-        // تعديل حجم الخط ليكون متناسقاً
         ImGuiIO& io = ImGui::GetIO();
-        io.FontGlobalScale = 2.0f; 
-        ImGui::GetStyle().ScaleAllSizes(2.0f);
+        io.FontGlobalScale = 2.5f; 
+        ImGui::GetStyle().ScaleAllSizes(2.5f);
         
         imguiInitialized = true;
     }
@@ -222,7 +213,6 @@ void ShowUI() {
     if (!showMenu && !radarBox) return;
 
     ImGuiIO& io = ImGui::GetIO();
-    // تحديث أبعاد الشاشة باستمرار
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
 
     MTLRenderPassDescriptor *desc = view.currentRenderPassDescriptor;
@@ -244,31 +234,42 @@ void ShowUI() {
 @end
 
 // ==========================================
-// [ 7. إصلاح إحداثيات اللمس للتحريك بحرية ]
+// [ 7. محرك الهوك السحري (كسر حاجز الشاشة) ]
 // ==========================================
 %hook UIWindow
+
+// هذه هي الدالة السحرية اللي راح تمط المنيو وتمنعه ينحصر!
+- (void)layoutSubviews {
+    %orig;
+    if (g_Overlay && g_MTKView) {
+        // إجبار المنيو على أخذ مقاس الشاشة الحقيقي باستمرار
+        g_Overlay.frame = self.bounds;
+        g_MTKView.frame = self.bounds;
+    }
+}
+
 - (void)makeKeyAndVisible {
     %orig;
+    // التأكد من الحقن في نافذة اللعبة الأساسية فقط
+    if (!self.rootViewController) return;
+
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            // استخدام الشاشة الكاملة بدلاً من حواف النافذة الضيقة
-            WessamOverlay *overlay = [[WessamOverlay alloc] initWithFrame:[UIScreen mainScreen].bounds];
-            [self addSubview:overlay];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            g_Overlay = [[WessamOverlay alloc] initWithFrame:self.bounds];
+            g_Overlay.layer.zPosition = 99999; // إجبار المود أن يكون فوق اللعبة دائماً
+            [self addSubview:g_Overlay];
         });
     });
 }
 
 - (void)sendEvent:(UIEvent *)event {
-    if (imguiInitialized) {
+    if (imguiInitialized && g_MTKView) {
         ImGuiIO& io = ImGui::GetIO();
         UITouch *touch = [[event allTouches] anyObject];
         
         if (touch) {
-            UIView *targetView = self.rootViewController.view ? self.rootViewController.view : self;
-            CGPoint loc = [touch locationInView:targetView];
-            
-            // قراءة الإحداثيات بشكل صحيح حسب دوران الشاشة
+            CGPoint loc = [touch locationInView:g_MTKView];
             io.MousePos = ImVec2(loc.x, loc.y);
             
             if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
@@ -276,7 +277,6 @@ void ShowUI() {
         }
     }
     
-    // إخفاء/ظهور بـ 3 أصابع
     UITouch *touch3 = [[event allTouches] anyObject];
     if ([[event allTouches] count] == 3 && touch3 && touch3.phase == UITouchPhaseBegan) {
         showMenu = !showMenu;
