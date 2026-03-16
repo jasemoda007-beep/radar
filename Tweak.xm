@@ -85,11 +85,41 @@ void fetch_json_and_inject() {
     }
 }
 
+void login_process(NSString *key) {
+    g_State = ACTIVATING;
+    NSString *udid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *urlStr = [NSString stringWithFormat:@"%@?key=%@&hwid=%@", ServerConfig::LoginAPI, key, udid];
+        NSURL *url = [NSURL URLWithString:urlStr];
+        NSString *response = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([response containsString:@"SUCCESS"]) {
+                NSArray *dataParts = [response componentsSeparatedByString:@"|"];
+                g_User.key = key;
+                if (dataParts.count >= 4) {
+                    g_User.type = dataParts[1];
+                    g_User.startDate = dataParts[2];
+                    g_User.endDate = dataParts[3];
+                } else {
+                    g_User.type = @"VIP Sub";
+                    g_User.startDate = @"Today";
+                    g_User.endDate = @"Unlimited";
+                }
+                fetch_json_and_inject();
+                g_State = SUCCESS_CARD;
+            } else {
+                g_State = LOGIN;
+            }
+        });
+    });
+}
+
 // ==========================================
-// [ 5. واجهات ImGui (تصميم الخدود الطويلة + الدخول المباشر) ]
+// [ 5. واجهات ImGui ]
 // ==========================================
 void ShowUI() {
-    // تصميم طولي مع حجم كبير متناسق
     ImGui::SetNextWindowSize(ImVec2(550, 950), ImGuiCond_FirstUseEver);
     
     if (g_State == LOGIN || g_State == ACTIVATING) {
@@ -102,7 +132,6 @@ void ShowUI() {
             ImGui::Separator();
             ImGui::Spacing();
             
-            // زر الدخول المباشر لتخطي مشكلة الكيبورد مؤقتاً
             if (ImGui::Button("AUTO LOGIN (TEST) 🚀", ImVec2(-1, 90))) {
                 g_User.key = @"WESSAM-TEST";
                 g_User.type = @"VIP Developer";
@@ -266,29 +295,6 @@ static MTKView *g_MTKView = nil;
         
         if (touch) {
             // أخذ الإحداثيات من g_MTKView مباشرة حتى ما يصير أي انحراف باللمس
-            CGPoint loc = [touch locationInView:g_MTKView];
-            io.MousePos = ImVec2(loc.x, loc.y);
-            
-            if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
-            else if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
-        }
-    }
-    
-    UITouch *touch3 = [[event allTouches] anyObject];
-    if ([[event allTouches] count] == 3 && touch3 && touch3.phase == UITouchPhaseBegan) {
-        showMenu = !showMenu;
-    }
-
-    %orig;
-}
-%end
-
-- (void)sendEvent:(UIEvent *)event {
-    if (imguiInitialized && g_MTKView) {
-        ImGuiIO& io = ImGui::GetIO();
-        UITouch *touch = [[event allTouches] anyObject];
-        
-        if (touch) {
             CGPoint loc = [touch locationInView:g_MTKView];
             io.MousePos = ImVec2(loc.x, loc.y);
             
