@@ -8,13 +8,10 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 0. إعدادات السيرفر والروابط (API & JSON) ]
+// [ 0. إعدادات السيرفر والروابط ]
 // ==========================================
 namespace ServerConfig {
-    // رابط التحقق من الكود (Login API)
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
-    
-    // رابط جلب الحماية والأوفستات أونلاين (JSON)
     NSString *OffsetsJSON = @"http://34.204.178.160/manager/offsets.json";
 }
 
@@ -44,7 +41,8 @@ namespace Offsets {
 // ==========================================
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
 ModState g_State = LOGIN;
-bool showMenu = true; // ظهوره الإجباري عند التشغيل
+bool showMenu = true; 
+bool imguiInitialized = false; // متغير لحماية اللعبة من الكراش
 NSArray *g_OnlineBypass = nil;
 
 struct UserData {
@@ -54,11 +52,10 @@ struct UserData {
     NSString *endDate;
 } g_User;
 
-// مفاتيح التفعيلات
 bool radarBox = true, aimbot = false, noRecoil = false;
 
 // ==========================================
-// [ 3. محرك الذاكرة والباتشات ]
+// [ 3. محرك الذاكرة ]
 // ==========================================
 uintptr_t get_base(const char* module) {
     if(!module) return (uintptr_t)_dyld_get_image_header(0);
@@ -87,14 +84,11 @@ void patch_memory(uintptr_t addr, NSString *hex) {
 // [ 4. محرك السيرفر (JSON & API) ]
 // ==========================================
 void fetch_json_and_inject() {
-    // استخدام الرابط من الإعدادات في الأعلى
     NSURL *url = [NSURL URLWithString:ServerConfig::OffsetsJSON];
     NSData *data = [NSData dataWithContentsOfURL:url];
     if (data) {
         NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         g_OnlineBypass = json[@"protection"];
-        
-        // حقن الحماية أونلاين تلقائياً
         for (NSDictionary *item in g_OnlineBypass) {
             uintptr_t moduleBase = get_base([item[@"module"] UTF8String]);
             uintptr_t offset = (uintptr_t)strtoull([item[@"offset"] UTF8String], NULL, 16);
@@ -108,17 +102,14 @@ void login_process(NSString *key) {
     NSString *udid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        // دمج الرابط مع الكود والـ HWID بشكل ديناميكي
         NSString *urlStr = [NSString stringWithFormat:@"%@?key=%@&hwid=%@", ServerConfig::LoginAPI, key, udid];
         NSURL *url = [NSURL URLWithString:urlStr];
         NSString *response = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
         
         dispatch_async(dispatch_get_main_queue(), ^{
-            // نتوقع أن السيرفر يرد هكذا: SUCCESS|VIP|2026-03-16|2026-04-16
             if ([response containsString:@"SUCCESS"]) {
                 NSArray *dataParts = [response componentsSeparatedByString:@"|"];
                 g_User.key = key;
-                
                 if (dataParts.count >= 4) {
                     g_User.type = dataParts[1];
                     g_User.startDate = dataParts[2];
@@ -128,18 +119,17 @@ void login_process(NSString *key) {
                     g_User.startDate = @"اليوم";
                     g_User.endDate = @"غير محدد";
                 }
-                
-                fetch_json_and_inject(); // سحب الـ JSON وحقن الحماية
+                fetch_json_and_inject();
                 g_State = SUCCESS_CARD;
             } else {
-                g_State = LOGIN; // فشل الدخول
+                g_State = LOGIN;
             }
         });
     });
 }
 
 // ==========================================
-// [ 5. واجهات ImGui الاحترافية ]
+// [ 5. واجهات ImGui ]
 // ==========================================
 void ShowUI() {
     ImGui::SetNextWindowSize(ImVec2(380, 280), ImGuiCond_FirstUseEver);
@@ -207,16 +197,89 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 6. محرك اللمس والإيماءات ]
+// [ 6. الطبقة العائمة (Overlay) المضمونة 100% ]
+// ==========================================
+@interface WessamOverlay : UIView <MTKViewDelegate>
+@property (nonatomic, strong) MTKView *mtkView;
+@property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
+@end
+
+@implementation WessamOverlay
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (self = [super initWithFrame:frame]) {
+        self.backgroundColor = [UIColor clearColor];
+        self.userInteractionEnabled = NO; // السماح للمس باختراق اللعبة
+
+        self.mtkView = [[MTKView alloc] initWithFrame:frame];
+        self.mtkView.device = MTLCreateSystemDefaultDevice();
+        self.mtkView.backgroundColor = [UIColor clearColor];
+        self.mtkView.clearColor = MTLClearColorMake(0, 0, 0, 0);
+        self.mtkView.delegate = self;
+        [self addSubview:self.mtkView];
+
+        self.commandQueue = [self.mtkView.device newCommandQueue];
+        
+        ImGui::CreateContext();
+        ImGui_ImplMetal_Init(self.mtkView.device);
+        imguiInitialized = true; // تم تشغيل المنيو بأمان!
+    }
+    return self;
+}
+
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
+
+- (void)drawInMTKView:(MTKView *)view {
+    if (!showMenu && !radarBox) return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
+
+    MTLRenderPassDescriptor *desc = view.currentRenderPassDescriptor;
+    if (!desc) return;
+
+    id<MTLCommandBuffer> buffer = [self.commandQueue commandBuffer];
+    ImGui_ImplMetal_NewFrame(desc);
+    ImGui::NewFrame();
+
+    ShowUI(); // رسم الواجهة
+
+    ImGui::Render();
+    id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
+    ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), buffer, encoder);
+    [encoder endEncoding];
+    [buffer presentDrawable:view.currentDrawable];
+    [buffer commit];
+}
+@end
+
+// ==========================================
+// [ 7. محرك الهوك المطور (اللمس وحقن الشاشة) ]
 // ==========================================
 %hook UIWindow
+- (void)makeKeyAndVisible {
+    %orig;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // حقن الشاشة الشفافة بعد 3 ثواني من فتح اللعبة لضمان التحميل
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            WessamOverlay *overlay = [[WessamOverlay alloc] initWithFrame:self.bounds];
+            [self addSubview:overlay];
+        });
+    });
+}
+
 - (void)sendEvent:(UIEvent *)event {
     %orig;
+    
+    // الحماية من الكراش! لا تقرأ اللمس إذا كان المنيو لم يُرسم بعد
+    if (!imguiInitialized) return;
+
     ImGuiIO& io = ImGui::GetIO();
     UITouch *touch = [[event allTouches] anyObject];
+    if (!touch) return;
+    
     CGPoint loc = [touch locationInView:self];
     
-    // ربط اللمس بالمنيو
     io.MousePos = ImVec2(loc.x, loc.y);
     if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
     if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
@@ -225,44 +288,5 @@ void ShowUI() {
     if ([[event allTouches] count] == 3 && touch.phase == UITouchPhaseBegan) {
         showMenu = !showMenu;
     }
-}
-%end
-
-// ==========================================
-// [ 7. محرك الرسم (الظهور الإجباري) ]
-// ==========================================
-%hook MTKView
-- (void)drawRect:(CGRect)rect {
-    %orig;
-    
-    if (!showMenu) return; // لا تستهلك الموارد إذا كان المنيو مخفياً
-
-    MTLRenderPassDescriptor *desc = self.currentRenderPassDescriptor;
-    if (!desc) return;
-
-    static id<MTLCommandQueue> queue = nil;
-    static BOOL setup = NO;
-    if (!setup) { 
-        queue = [self.device newCommandQueue]; 
-        ImGui_ImplMetal_Init(self.device); 
-        setup = YES; 
-    }
-
-    // إجبار المنيو على معرفة أبعاد الشاشة
-    ImGui::GetIO().DisplaySize = ImVec2(rect.size.width, rect.size.height);
-    
-    id<MTLCommandBuffer> buffer = [queue commandBuffer];
-    ImGui_ImplMetal_NewFrame(desc);
-    ImGui::NewFrame();
-
-    // رسم واجهاتنا
-    ShowUI();
-
-    ImGui::Render();
-    id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
-    ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), buffer, encoder);
-    [encoder endEncoding];
-    [buffer presentDrawable:self.currentDrawable];
-    [buffer commit];
 }
 %end
