@@ -15,8 +15,12 @@ namespace ServerConfig {
 }
 
 namespace Global {
-    uintptr_t GWorld_Func = 0x102A5125C; // دالة فك التشفير
-    uintptr_t GWorld_Data = 0x10A4A1960; // مفتاح البيانات
+    // إحداثيات مسعود الجديدة والمضبوطة 100% 🔥
+    uintptr_t GWorld_Func = 0x102A62208;
+    uintptr_t GWorld_Data = 0x10A566E00;
+    uintptr_t GName_Func  = 0x104bd8740;
+    uintptr_t GName_Data  = 0x10a1178b0;
+    uintptr_t GObject     = 0x10A34E980;
 }
 
 namespace Offsets {
