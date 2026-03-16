@@ -185,24 +185,28 @@ void ShowUI() {
 @end
 
 // ==========================================
-// [ 5. التشغيل الذكي (مسروق من مشروع Dolphins) ]
+// [ 5. التشغيل الذكي (إصلاح تشنج متصفح تسجيل الدخول) ]
 // ==========================================
 static void didFinishLaunching(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef info) {
-    // ننتظر 4 ثواني حتى تفتح اللعبة وتستقر شاشتها
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // ننتظر 5 ثواني حتى تفتح اللعبة وتستقر شاشتها
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         UIWindow *mainWindow = [UIApplication sharedApplication].keyWindow;
         if (!mainWindow) mainWindow = [[UIApplication sharedApplication].windows firstObject];
         
-        if (mainWindow) {
-            WessamView *overlay = [[WessamView alloc] initWithFrame:mainWindow.bounds];
-            overlay.layer.zPosition = 99999;
-            [mainWindow addSubview:overlay];
+        // 🔥 السر هنا: نحقن داخل اللعبة فقط، حتى ما نغطي على متصفح جوجل (Safari) 🔥
+        UIViewController *rootVC = mainWindow.rootViewController;
+        
+        if (rootVC && rootVC.view) {
+            WessamView *overlay = [[WessamView alloc] initWithFrame:rootVC.view.bounds];
+            
+            // تم إزالة layer.zPosition = 99999 لمنع التشنج
+            [rootVC.view addSubview:overlay];
             
             // إضافة حساس أبل الأصلي للإخفاء بـ 3 أصابع
             UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:overlay action:@selector(toggleMenu)];
             tap.numberOfTouchesRequired = 3;
-            [mainWindow addGestureRecognizer:tap];
+            [rootVC.view addGestureRecognizer:tap];
         }
     });
 }
