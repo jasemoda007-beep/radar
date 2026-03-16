@@ -7,7 +7,7 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 1. الأوفستات والعناوين الأساسية ]
+// [ 1. الأوفستات والعناوين الأساسية (محدثة من ملف Dolphins) ]
 // ==========================================
 namespace ServerConfig {
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
@@ -19,7 +19,6 @@ namespace Global {
     uintptr_t GWorld_Data = 0x10A566E00;
     uintptr_t GName_Func  = 0x104bd8740;
     uintptr_t GName_Data  = 0x10a1178b0;
-    uintptr_t GObject     = 0x10A34E980;
 }
 
 namespace Offsets {
@@ -27,14 +26,16 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
-    // أوفستات اللاعب والكاميرا (تقريبية للنسخ الحديثة)
-    int LocalPlayer = 0x48;       // GameInstance -> LocalPlayer
-    int PlayerController = 0x30;  // LocalPlayer -> PlayerController
-    int PlayerCameraManager = 0x340; // PlayerController -> PlayerCameraManager
-    int CameraCache = 0x350;      // PlayerCameraManager -> CameraCachePrivate
+    // أوفستات مسعود الذهبية للكاميرا وموقع اللاعب 🎯
+    int Ptr1 = 0x38;
+    int Ptr2 = 0x78;
+    int Ptr3 = 0x30;
+    int SelfOffset = 0x28d0;
+    int CameraManager = 0x548;
+    int CameraPOV = 0x10b0; // 0x10a0 + 0x10 (PovOffset)
     
-    int RootComponent = 0x158;    // Actor -> RootComponent
-    int RelativeLocation = 0x11c; // RootComponent -> RelativeLocation
+    int RootComponent = 0x208; // ObjectParam::CoordOffset
+    int RelativeLocation = 0x208; // CoordParam::CoordOffset
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -86,29 +87,12 @@ struct ImVec3 {
 };
 
 struct Ue4Rotator { float pitch, yaw, roll; };
+struct MinimalViewInfo { ImVec3 location; Ue4Rotator rotation; float fov; };
 
-// هيكل الكاميرا
-struct MinimalViewInfo {
-    ImVec3 location;
-    ImVec3 rotation;
-    float fov;
-    float orthoWidth;
-    float orthoNearClipPlane;
-    float orthoFarClipPlane;
-    float aspectRatio;
-};
-
-// هيكل تخزين الكاميرا
-struct CameraCacheEntry {
-    float timestamp;
-    char pad[0xC];
-    MinimalViewInfo pov;
-};
-
-Ue4Matrix rotatorToMatrix(ImVec3 rotation) {
-    float radPitch = rotation.x * ((float) M_PI / 180.0f);
-    float radYaw = rotation.y * ((float) M_PI / 180.0f);
-    float radRoll = rotation.z * ((float) M_PI / 180.0f);
+Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
+    float radPitch = rotation.pitch * ((float) M_PI / 180.0f);
+    float radYaw = rotation.yaw * ((float) M_PI / 180.0f);
+    float radRoll = rotation.roll * ((float) M_PI / 180.0f);
     
     float SP = sinf(radPitch); float CP = cosf(radPitch);
     float SY = sinf(radYaw);   float CY = cosf(radYaw);
@@ -130,7 +114,6 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     
     ImVec3 vDelta = worldLocation - camViewInfo.location;
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
-    
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
     ImVec2 screenCoord;
@@ -141,73 +124,66 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار الحقيقي (ESP Engine) ]
+// [ 4. محرك الرادار (ESP Loop) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
 
     uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
-    
-    // 1. فك تشفير GWorld
     typedef uintptr_t (*GWorldFn)(uintptr_t);
     GWorldFn get_gworld = (GWorldFn)(slide + Global::GWorld_Func);
     uintptr_t gWorld = get_gworld(slide + Global::GWorld_Data);
+    
     if (!gWorld) return;
 
-    // 2. قراءة ULevel
     uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
     if (!uLevel) return;
 
-    // 3. قراءة الكاميرا (لتحويل الإحداثيات)
-    uintptr_t gameInstance = ReadMem<uintptr_t>(gWorld + 0x24); // OwningGameInstance
-    uintptr_t localPlayerArray = ReadMem<uintptr_t>(gameInstance + 0x38); // LocalPlayers
-    uintptr_t localPlayer = ReadMem<uintptr_t>(localPlayerArray);
-    uintptr_t playerController = ReadMem<uintptr_t>(localPlayer + Offsets::PlayerController);
-    uintptr_t playerCameraManager = ReadMem<uintptr_t>(playerController + Offsets::PlayerCameraManager);
+    // قراءة الكاميرا الخاصة باللاعب من أوفستات مسعود
+    uintptr_t ptr1 = ReadMem<uintptr_t>(gWorld + Offsets::Ptr1);
+    uintptr_t ptr2 = ReadMem<uintptr_t>(ptr1 + Offsets::Ptr2);
+    uintptr_t playerController = ReadMem<uintptr_t>(ptr2 + Offsets::Ptr3);
+    uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
     
-    CameraCacheEntry cameraCache = ReadMem<CameraCacheEntry>(playerCameraManager + Offsets::CameraCache);
-    MinimalViewInfo pov = cameraCache.pov;
+    MinimalViewInfo pov = ReadMem<MinimalViewInfo>(cameraManager + Offsets::CameraPOV);
+    uintptr_t selfActor = ReadMem<uintptr_t>(playerController + Offsets::SelfOffset);
 
-    // 4. قراءة المصفوفة والعدد
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
     int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
     
     if (actorCount < 1 || actorCount > 10000) return;
-
+    
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
 
-    // 5. حلقة الرسم (ESP Loop)
     for (int i = 0; i < actorCount; i++) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
         if (!actor) continue;
 
-        // قراءة موقع الـ Actor
-        uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent); 
+        // تجاهل اللاعب نفسه حتى ما يرسم مربع عليك
+        if (actor == selfActor) continue;
+
+        uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
         if (!rootComponent) continue;
         
-        ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation); 
+        ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
         
-        // تحويل الموقع من 3D إلى 2D
+        // التحويل إلى الشاشة باستخدام الكاميرا الحقيقية
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
-        // إذا كان الموقع داخل الشاشة، ارسم المربع
+        // إذا كان ضمن حدود الشاشة، ارسم!
         if (screenPos.x > 0 && screenPos.y > 0 && screenPos.x < screenSize.x && screenPos.y < screenSize.y) {
             
-            // حساب المسافة بين اللاعب والكاميرا (لتصغير/تكبير المربع)
+            // حساب المسافة حتى نتحكم بحجم المربع
             float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2) + pow(pov.location.z - actorLocation.z, 2)) / 100.0f;
+            if (distance < 1.0f || distance > 600.0f) continue;
             
-            // تجنب رسم مربعات على الأشياء القريبة جداً أو البعيدة جداً
-            if (distance < 1.0f || distance > 500.0f) continue;
+            float boxWidth = 800.0f / distance;
+            float boxHeight = 1600.0f / distance;
             
-            float boxWidth = 1000.0f / distance;
-            float boxHeight = 2000.0f / distance;
-            
-            // رسم المربع
             draw->AddRect(ImVec2(screenPos.x - (boxWidth / 2), screenPos.y - boxHeight), 
                           ImVec2(screenPos.x + (boxWidth / 2), screenPos.y), 
                           IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
                           
-            // رسم خط
             draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
                           ImVec2(screenPos.x, screenPos.y), 
                           IM_COL32(255, 255, 255, 100), 1.0f);
@@ -262,7 +238,7 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 6. الطبقة العائمة (بأسلوب Dolphins) ]
+// [ 6. الطبقة العائمة ]
 // ==========================================
 @interface WessamView : MTKView <MTKViewDelegate>
 @property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
