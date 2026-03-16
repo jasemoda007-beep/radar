@@ -7,7 +7,7 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 1. الأوفستات والعناوين الأساسية (محدثة من ملف Dolphins) ]
+// [ 1. الأوفستات والعناوين الأساسية ]
 // ==========================================
 namespace ServerConfig {
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
@@ -26,16 +26,15 @@ namespace Offsets {
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
     
-    // أوفستات مسعود الذهبية للكاميرا وموقع اللاعب 🎯
     int Ptr1 = 0x38;
     int Ptr2 = 0x78;
     int Ptr3 = 0x30;
     int SelfOffset = 0x28d0;
     int CameraManager = 0x548;
-    int CameraPOV = 0x10b0; // 0x10a0 + 0x10 (PovOffset)
+    int CameraPOV = 0x10b0; 
     
-    int RootComponent = 0x208; // ObjectParam::CoordOffset
-    int RelativeLocation = 0x208; // CoordParam::CoordOffset
+    int RootComponent = 0x208; 
+    int RelativeLocation = 0x208; 
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -99,6 +98,30 @@ Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
     float SR = sinf(radRoll);  float CR = cosf(radRoll);
     
     Ue4Matrix matrix;
+    matrix[0][0] = (CP * CY); matrix[0][1] = (CP * SY); matrix[0][2] = (SP); matrix[0][3] = 0;
+    matrix[1][0] = (SR * SP * CY - CR * SY); matrix[1][1] = (SR * SP * SY + CR * CY); matrix[1][2] = (-SR * CP); matrix[1][3] = 0;
+    matrix[2][0] = (-(CR * SP * CY + SR * SY)); matrix[2][1] = (CY * SR - CR * SP * SY); matrix[2][2] = (CR * CP); matrix[2][3] = 0;
+    matrix[3][0] = 0; matrix[3][1] = 0; matrix[3][2] = 0; matrix[3][3] = 1;
+    return matrix;
+}
+
+ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 screenCenter) {
+    Ue4Matrix tempMatrix = rotatorToMatrix(camViewInfo.rotation);
+    ImVec3 vAxisX(tempMatrix[0][0], tempMatrix[0][1], tempMatrix[0][2]);
+    ImVec3 vAxisY(tempMatrix[1][0], tempMatrix[1][1], tempMatrix[1][2]);
+    ImVec3 vAxisZ(tempMatrix[2][0], tempMatrix[2][1], tempMatrix[2][2]);
+    
+    ImVec3 vDelta = worldLocation - camViewInfo.location;
+    ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
+    if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
+    
+    ImVec2 screenCoord;
+    float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
+    screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
+    screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
+    return screenCoord;
+}
+
 // ==========================================
 // [ 4. محرك الرادار (ESP Loop - وضع الفحص) ]
 // ==========================================
@@ -154,31 +177,6 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         }
     }
 }
-    matrix[0][0] = (CP * CY); matrix[0][1] = (CP * SY); matrix[0][2] = (SP); matrix[0][3] = 0;
-    matrix[1][0] = (SR * SP * CY - CR * SY); matrix[1][1] = (SR * SP * SY + CR * CY); matrix[1][2] = (-SR * CP); matrix[1][3] = 0;
-    matrix[2][0] = (-(CR * SP * CY + SR * SY)); matrix[2][1] = (CY * SR - CR * SP * SY); matrix[2][2] = (CR * CP); matrix[2][3] = 0;
-    matrix[3][0] = 0; matrix[3][1] = 0; matrix[3][2] = 0; matrix[3][3] = 1;
-    return matrix;
-}
-
-ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 screenCenter) {
-    Ue4Matrix tempMatrix = rotatorToMatrix(camViewInfo.rotation);
-    ImVec3 vAxisX(tempMatrix[0][0], tempMatrix[0][1], tempMatrix[0][2]);
-    ImVec3 vAxisY(tempMatrix[1][0], tempMatrix[1][1], tempMatrix[1][2]);
-    ImVec3 vAxisZ(tempMatrix[2][0], tempMatrix[2][1], tempMatrix[2][2]);
-    
-    ImVec3 vDelta = worldLocation - camViewInfo.location;
-    ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
-    if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
-    
-    ImVec2 screenCoord;
-    float fovCalc = screenCenter.x / tanf(camViewInfo.fov * ((float) M_PI / 360.0f));
-    screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
-    screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
-    return screenCoord;
-}
-
-// ==========================================
 
 // ==========================================
 // [ 5. واجهات ImGui ]
