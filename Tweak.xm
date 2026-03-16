@@ -171,7 +171,7 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 6. الطبقة العائمة مع التكبير الإجباري ]
+// [ 6. الطبقة العائمة (إصلاح الشاشة الكاملة) ]
 // ==========================================
 @interface WessamOverlay : UIView <MTKViewDelegate>
 @property (nonatomic, strong) MTKView *mtkView;
@@ -180,15 +180,25 @@ void ShowUI() {
 
 @implementation WessamOverlay
 - (instancetype)initWithFrame:(CGRect)frame {
-    if (self = [super initWithFrame:frame]) {
+    // إجبار الطبقة على أخذ أبعاد الشاشة بالعرض (Landscape)
+    CGRect fullScreen = [UIScreen mainScreen].bounds;
+    if (fullScreen.size.width < fullScreen.size.height) {
+        fullScreen = CGRectMake(0, 0, fullScreen.size.height, fullScreen.size.width);
+    }
+
+    if (self = [super initWithFrame:fullScreen]) {
         self.backgroundColor = [UIColor clearColor];
         self.userInteractionEnabled = NO;
+        
+        // التمدد التلقائي مع الشاشة
+        self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
-        self.mtkView = [[MTKView alloc] initWithFrame:frame];
+        self.mtkView = [[MTKView alloc] initWithFrame:self.bounds];
         self.mtkView.device = MTLCreateSystemDefaultDevice();
         self.mtkView.backgroundColor = [UIColor clearColor];
         self.mtkView.clearColor = MTLClearColorMake(0, 0, 0, 0);
         self.mtkView.delegate = self;
+        self.mtkView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         [self addSubview:self.mtkView];
 
         self.commandQueue = [self.mtkView.device newCommandQueue];
@@ -196,10 +206,10 @@ void ShowUI() {
         ImGui::CreateContext();
         ImGui_ImplMetal_Init(self.mtkView.device);
         
-        // التكبير الإجباري لشاشات الريتنا! (الخط والأزرار)
+        // تعديل حجم الخط ليكون متناسقاً
         ImGuiIO& io = ImGui::GetIO();
-        io.FontGlobalScale = 2.5f; 
-        ImGui::GetStyle().ScaleAllSizes(2.5f);
+        io.FontGlobalScale = 2.0f; 
+        ImGui::GetStyle().ScaleAllSizes(2.0f);
         
         imguiInitialized = true;
     }
@@ -212,6 +222,7 @@ void ShowUI() {
     if (!showMenu && !radarBox) return;
 
     ImGuiIO& io = ImGui::GetIO();
+    // تحديث أبعاد الشاشة باستمرار
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
 
     MTLRenderPassDescriptor *desc = view.currentRenderPassDescriptor;
@@ -240,8 +251,9 @@ void ShowUI() {
     %orig;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            WessamOverlay *overlay = [[WessamOverlay alloc] initWithFrame:self.bounds];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            // استخدام الشاشة الكاملة بدلاً من حواف النافذة الضيقة
+            WessamOverlay *overlay = [[WessamOverlay alloc] initWithFrame:[UIScreen mainScreen].bounds];
             [self addSubview:overlay];
         });
     });
@@ -253,10 +265,10 @@ void ShowUI() {
         UITouch *touch = [[event allTouches] anyObject];
         
         if (touch) {
-            // استخدام rootViewController لضمان قراءة إحداثيات العرض (Landscape) بدقة
             UIView *targetView = self.rootViewController.view ? self.rootViewController.view : self;
             CGPoint loc = [touch locationInView:targetView];
             
+            // قراءة الإحداثيات بشكل صحيح حسب دوران الشاشة
             io.MousePos = ImVec2(loc.x, loc.y);
             
             if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
