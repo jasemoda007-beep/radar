@@ -15,7 +15,6 @@ namespace ServerConfig {
 }
 
 namespace Global {
-    // إحداثيات مسعود الجديدة والمضبوطة 100% 🔥
     uintptr_t GWorld_Func = 0x102A62208;
     uintptr_t GWorld_Data = 0x10A566E00;
     uintptr_t GName_Func  = 0x104bd8740;
@@ -27,7 +26,15 @@ namespace Offsets {
     int ULevel = 0x30;
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
-    int Recoil = 0xc50;
+    
+    // أوفستات اللاعب والكاميرا (تقريبية للنسخ الحديثة)
+    int LocalPlayer = 0x48;       // GameInstance -> LocalPlayer
+    int PlayerController = 0x30;  // LocalPlayer -> PlayerController
+    int PlayerCameraManager = 0x340; // PlayerController -> PlayerCameraManager
+    int CameraCache = 0x350;      // PlayerCameraManager -> CameraCachePrivate
+    
+    int RootComponent = 0x158;    // Actor -> RootComponent
+    int RelativeLocation = 0x11c; // RootComponent -> RelativeLocation
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -79,12 +86,29 @@ struct ImVec3 {
 };
 
 struct Ue4Rotator { float pitch, yaw, roll; };
-struct MinimalViewInfo { ImVec3 location; Ue4Rotator rotation; float fov; };
 
-Ue4Matrix rotatorToMatrix(Ue4Rotator rotation) {
-    float radPitch = rotation.pitch * ((float) M_PI / 180.0f);
-    float radYaw = rotation.yaw * ((float) M_PI / 180.0f);
-    float radRoll = rotation.roll * ((float) M_PI / 180.0f);
+// هيكل الكاميرا
+struct MinimalViewInfo {
+    ImVec3 location;
+    ImVec3 rotation;
+    float fov;
+    float orthoWidth;
+    float orthoNearClipPlane;
+    float orthoFarClipPlane;
+    float aspectRatio;
+};
+
+// هيكل تخزين الكاميرا
+struct CameraCacheEntry {
+    float timestamp;
+    char pad[0xC];
+    MinimalViewInfo pov;
+};
+
+Ue4Matrix rotatorToMatrix(ImVec3 rotation) {
+    float radPitch = rotation.x * ((float) M_PI / 180.0f);
+    float radYaw = rotation.y * ((float) M_PI / 180.0f);
+    float radRoll = rotation.z * ((float) M_PI / 180.0f);
     
     float SP = sinf(radPitch); float CP = cosf(radPitch);
     float SY = sinf(radYaw);   float CY = cosf(radYaw);
@@ -106,6 +130,7 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     
     ImVec3 vDelta = worldLocation - camViewInfo.location;
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
+    
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
     ImVec2 screenCoord;
@@ -116,35 +141,78 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
 }
 
 // ==========================================
-// [ 4. محرك الرادار (ESP Loop - فك التشفير) ]
+// [ 4. محرك الرادار الحقيقي (ESP Engine) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
     if (!radarBox) return;
 
     uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
+    
+    // 1. فك تشفير GWorld
     typedef uintptr_t (*GWorldFn)(uintptr_t);
     GWorldFn get_gworld = (GWorldFn)(slide + Global::GWorld_Func);
     uintptr_t gWorld = get_gworld(slide + Global::GWorld_Data);
-    
-    if (!gWorld) {
-        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "GWorld Not Found!");
-        return;
-    }
+    if (!gWorld) return;
 
+    // 2. قراءة ULevel
     uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
-    if (!uLevel) {
-        draw->AddText(ImVec2(screenSize.x / 2 - 50, 50), IM_COL32(255, 0, 0, 255), "ULevel Not Found!");
-        return;
-    }
+    if (!uLevel) return;
 
+    // 3. قراءة الكاميرا (لتحويل الإحداثيات)
+    uintptr_t gameInstance = ReadMem<uintptr_t>(gWorld + 0x24); // OwningGameInstance
+    uintptr_t localPlayerArray = ReadMem<uintptr_t>(gameInstance + 0x38); // LocalPlayers
+    uintptr_t localPlayer = ReadMem<uintptr_t>(localPlayerArray);
+    uintptr_t playerController = ReadMem<uintptr_t>(localPlayer + Offsets::PlayerController);
+    uintptr_t playerCameraManager = ReadMem<uintptr_t>(playerController + Offsets::PlayerCameraManager);
+    
+    CameraCacheEntry cameraCache = ReadMem<CameraCacheEntry>(playerCameraManager + Offsets::CameraCache);
+    MinimalViewInfo pov = cameraCache.pov;
+
+    // 4. قراءة المصفوفة والعدد
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
     int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
     
-    char infoText[256];
-    sprintf(infoText, "[+] Memory Hooked! Actors Count: %d", actorCount);
-    draw->AddText(ImVec2(screenSize.x / 2 - 130, 80), IM_COL32(0, 255, 0, 255), infoText);
-    
-    draw->AddRect(ImVec2(screenSize.x / 2 - 50, 120), ImVec2(screenSize.x / 2 + 50, 220), IM_COL32(255, 255, 0, 255), 0, 0, 2.0f);
+    if (actorCount < 1 || actorCount > 10000) return;
+
+    ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
+
+    // 5. حلقة الرسم (ESP Loop)
+    for (int i = 0; i < actorCount; i++) {
+        uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
+        if (!actor) continue;
+
+        // قراءة موقع الـ Actor
+        uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent); 
+        if (!rootComponent) continue;
+        
+        ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation); 
+        
+        // تحويل الموقع من 3D إلى 2D
+        ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
+
+        // إذا كان الموقع داخل الشاشة، ارسم المربع
+        if (screenPos.x > 0 && screenPos.y > 0 && screenPos.x < screenSize.x && screenPos.y < screenSize.y) {
+            
+            // حساب المسافة بين اللاعب والكاميرا (لتصغير/تكبير المربع)
+            float distance = sqrt(pow(pov.location.x - actorLocation.x, 2) + pow(pov.location.y - actorLocation.y, 2) + pow(pov.location.z - actorLocation.z, 2)) / 100.0f;
+            
+            // تجنب رسم مربعات على الأشياء القريبة جداً أو البعيدة جداً
+            if (distance < 1.0f || distance > 500.0f) continue;
+            
+            float boxWidth = 1000.0f / distance;
+            float boxHeight = 2000.0f / distance;
+            
+            // رسم المربع
+            draw->AddRect(ImVec2(screenPos.x - (boxWidth / 2), screenPos.y - boxHeight), 
+                          ImVec2(screenPos.x + (boxWidth / 2), screenPos.y), 
+                          IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
+                          
+            // رسم خط
+            draw->AddLine(ImVec2(screenCenter.x, screenSize.y), 
+                          ImVec2(screenPos.x, screenPos.y), 
+                          IM_COL32(255, 255, 255, 100), 1.0f);
+        }
+    }
 }
 
 // ==========================================
