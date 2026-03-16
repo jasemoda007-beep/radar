@@ -28,8 +28,9 @@ jobs:
         run: |
           curl -LO https://github.com/theos/sdks/archive/master.zip
           unzip -q master.zip
-          mv sdks-master/* ~/theos/sdks/
+          cp -R sdks-master/* ~/theos/sdks/
           rm -rf master.zip sdks-master
+          
 
       - name: Build Tweak (عملية الصهر)
         run: |
