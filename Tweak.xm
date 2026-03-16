@@ -2,149 +2,47 @@
 #import <Foundation/Foundation.h>
 #import <mach-o/dyld.h>
 #import <mach/mach.h>
-#import <substrate.h>
 #import <MetalKit/MetalKit.h>
 #import "ImGui/imgui.h"
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 0. إعدادات السيرفر والروابط ]
+// [ 0. إعدادات السيرفر والمود ]
 // ==========================================
 namespace ServerConfig {
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
     NSString *OffsetsJSON = @"http://34.204.178.160/manager/offsets.json";
 }
 
-namespace Global {
-    uintptr_t GWorld = 0x10A4A1960;
-    uintptr_t GNames = 0x10A0557E0;
-    uintptr_t GObject = 0x10A288B80;
-    uintptr_t W2S = 0x105EFB82C;
-}
-
-namespace Offsets {
-    int ULevel = 0x30;
-    int ActorArray = 0xA0;
-    int ActorCount = 0xA8;
-    int Health = 0xdb8;
-    int Team = 0x938;
-    int Mesh = 0x4a8;
-    int Robot = 0x9d0;
-    int Recoil = 0xc50;
-}
+namespace Offsets { int Recoil = 0xc50; }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
 ModState g_State = LOGIN;
 bool showMenu = true; 
 bool imguiInitialized = false; 
-NSArray *g_OnlineBypass = nil;
 
 struct UserData {
     NSString *key;
     NSString *type;
-    NSString *startDate;
-    NSString *endDate;
 } g_User;
 
 bool radarBox = true, aimbot = false, noRecoil = false;
 
-uintptr_t get_base(const char* module) {
-    if(!module) return (uintptr_t)_dyld_get_image_header(0);
-    uint32_t count = _dyld_image_count();
-    for (uint32_t i = 0; i < count; i++) {
-        if (strstr(_dyld_get_image_name(i), module)) return (uintptr_t)_dyld_get_image_header(i);
-    }
-    return 0;
-}
-
-void patch_memory(uintptr_t addr, NSString *hex) {
-    if (!addr) return;
-    hex = [hex stringByReplacingOccurrencesOfString:@" " withString:@""];
-    NSMutableData *data = [NSMutableData data];
-    for (int i = 0; i < [hex length]; i += 2) {
-        unsigned int b;
-        [[NSScanner scannerWithString:[hex substringWithRange:NSMakeRange(i, 2)]] scanHexInt:&b];
-        [data appendBytes:&b length:1];
-    }
-    vm_protect(mach_task_self(), (vm_address_t)addr, data.length, FALSE, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
-    memcpy((void *)addr, data.bytes, data.length);
-    vm_protect(mach_task_self(), (vm_address_t)addr, data.length, FALSE, VM_PROT_READ | VM_PROT_EXECUTE);
-}
-
-void fetch_json_and_inject() {
-    NSURL *url = [NSURL URLWithString:ServerConfig::OffsetsJSON];
-    NSData *data = [NSData dataWithContentsOfURL:url];
-    if (data) {
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        g_OnlineBypass = json[@"protection"];
-        for (NSDictionary *item in g_OnlineBypass) {
-            uintptr_t moduleBase = get_base([item[@"module"] UTF8String]);
-            uintptr_t offset = (uintptr_t)strtoull([item[@"offset"] UTF8String], NULL, 16);
-            patch_memory(moduleBase + offset, item[@"patch"]);
-        }
-    }
-}
-
-void login_process(NSString *key) {
-    g_State = ACTIVATING;
-    NSString *udid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
-    
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSString *urlStr = [NSString stringWithFormat:@"%@?key=%@&hwid=%@", ServerConfig::LoginAPI, key, udid];
-        NSURL *url = [NSURL URLWithString:urlStr];
-        NSString *response = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
-        
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([response containsString:@"SUCCESS"]) {
-                NSArray *dataParts = [response componentsSeparatedByString:@"|"];
-                g_User.key = key;
-                if (dataParts.count >= 4) {
-                    g_User.type = dataParts[1];
-                    g_User.startDate = dataParts[2];
-                    g_User.endDate = dataParts[3];
-                } else {
-                    g_User.type = @"VIP Sub";
-                    g_User.startDate = @"Today";
-                    g_User.endDate = @"Unlimited";
-                }
-                fetch_json_and_inject();
-                g_State = SUCCESS_CARD;
-            } else {
-                g_State = LOGIN;
-            }
-        });
-    });
-}
-
 // ==========================================
-// [ 5. واجهات ImGui ]
+// [ 1. واجهات ImGui ]
 // ==========================================
 void ShowUI() {
-    ImGui::SetNextWindowSize(ImVec2(550, 950), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(600, 450), ImGuiCond_FirstUseEver);
     
-    if (g_State == LOGIN || g_State == ACTIVATING) {
+    if (g_State == LOGIN) {
         ImGui::Begin("WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "System Ready! (Dolphins Engine)");
+        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         
-        if (g_State == LOGIN) {
-            ImGui::TextColored(ImVec4(0, 1, 0, 1), "System Ready for Injection!");
-            ImGui::Spacing();
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-            
-            if (ImGui::Button("AUTO LOGIN (TEST) 🚀", ImVec2(-1, 90))) {
-                g_User.key = @"WESSAM-TEST";
-                g_User.type = @"VIP Developer";
-                g_User.startDate = @"Today";
-                g_User.endDate = @"Forever";
-                g_State = SUCCESS_CARD;
-            }
-            ImGui::Spacing();
-            ImGui::TextWrapped("Note: Press the button above to bypass the keyboard and enter the menu directly.");
-
-        } else {
-            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Connecting to Server...");
-            ImGui::Text("Please wait...");
+        if (ImGui::Button("AUTO LOGIN (TEST) 🚀", ImVec2(-1, 90))) {
+            g_User.key = @"WESSAM-TEST";
+            g_User.type = @"VIP Developer";
+            g_State = SUCCESS_CARD;
         }
         ImGui::End();
     } 
@@ -152,12 +50,6 @@ void ShowUI() {
         ImGui::Begin("SUCCESS", &showMenu, ImGuiWindowFlags_NoCollapse);
         ImGui::TextColored(ImVec4(0, 1, 0, 1), "Mod Activated Successfully!");
         ImGui::Separator();
-        ImGui::Text("Key: %s", [g_User.key UTF8String]);
-        ImGui::Text("Type: %s", [g_User.type UTF8String]);
-        ImGui::Text("Start: %s", [g_User.startDate UTF8String]);
-        ImGui::Text("End: %s", [g_User.endDate UTF8String]);
-        ImGui::Separator();
-        
         if (ImGui::Button("ENTER MAIN MENU 🎮", ImVec2(-1, 90))) {
             g_State = MAIN_MENU;
         }
@@ -174,23 +66,6 @@ void ShowUI() {
             if (ImGui::BeginTabItem("Aimbot")) {
                 ImGui::Spacing();
                 ImGui::Checkbox(" Enable Magic Bullet", &aimbot);
-                ImGui::Spacing();
-                if (ImGui::Checkbox(" Enable No Recoil", &noRecoil)) {
-                    uintptr_t addr = get_base(NULL) + Offsets::Recoil;
-                    patch_memory(addr, noRecoil ? @"00 00 00 00" : @"00 00 A0 41");
-                }
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Server Bypass")) {
-                ImGui::Spacing();
-                ImGui::TextColored(ImVec4(0, 1, 0, 1), "Injected Online Bypasses:");
-                if (g_OnlineBypass) {
-                    for (NSDictionary *item in g_OnlineBypass) {
-                        ImGui::BulletText("%s", [item[@"name"] UTF8String]);
-                    }
-                } else {
-                    ImGui::Text("No bypass loaded yet.");
-                }
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -200,49 +75,86 @@ void ShowUI() {
 }
 
 // ==========================================
-// [ 6. الطبقة العائمة (العودة للأساس القوي مع إصلاح الأبعاد) ]
+// [ 2. الطبقة العائمة (بأسلوب Dolphins الأصلي) ]
 // ==========================================
-static MTKView *g_MTKView = nil;
-
-@interface WessamOverlay : UIView <MTKViewDelegate>
+@interface WessamView : MTKView <MTKViewDelegate>
 @property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
 @end
 
-@implementation WessamOverlay
+@implementation WessamView
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO;
-
-        g_MTKView = [[MTKView alloc] initWithFrame:self.bounds];
-        g_MTKView.device = MTLCreateSystemDefaultDevice();
-        g_MTKView.backgroundColor = [UIColor clearColor];
-        g_MTKView.clearColor = MTLClearColorMake(0, 0, 0, 0);
-        g_MTKView.delegate = self;
+        self.clearColor = MTLClearColorMake(0, 0, 0, 0);
+        self.device = MTLCreateSystemDefaultDevice();
+        self.delegate = self;
         
-        [self addSubview:g_MTKView];
+        // التمدد التلقائي مع اللعبة
+        self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        
+        // السماح باللمس الأصلي
+        self.userInteractionEnabled = YES;
+        
+        // إصلاح الأبعاد (الريتنا)
+        CGFloat scale = [UIScreen mainScreen].scale;
+        self.contentScaleFactor = scale;
 
-        self.commandQueue = [g_MTKView.device newCommandQueue];
+        self.commandQueue = [self.device newCommandQueue];
         
         ImGui::CreateContext();
-        ImGui_ImplMetal_Init(g_MTKView.device);
+        ImGui_ImplMetal_Init(self.device);
         
         ImGuiIO& io = ImGui::GetIO();
-        io.FontGlobalScale = 2.5f; 
-        ImGui::GetStyle().ScaleAllSizes(2.5f);
+        io.DisplayFramebufferScale = ImVec2(scale, scale);
+        io.FontGlobalScale = 2.0f; 
+        ImGui::GetStyle().ScaleAllSizes(2.0f);
         
         imguiInitialized = true;
     }
     return self;
 }
 
-- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
+// ==========================================
+// [ 3. محرك اللمس الأصلي (بدون هوك!) ]
+// ==========================================
+- (void)updateIOWithTouches:(NSSet<UITouch *> *)touches {
+    ImGuiIO& io = ImGui::GetIO();
+    UITouch *touch = [touches anyObject];
+    if (touch) {
+        CGPoint loc = [touch locationInView:self]; // هنا الآيفون يحسبها صح 100%
+        io.MousePos = ImVec2(loc.x, loc.y);
+        if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
+        else if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
+    }
+}
 
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouches:touches]; }
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouches:touches]; }
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouches:touches]; }
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouches:touches]; }
+
+// تمرير اللمس للعبة إذا كان المنيو مغلق
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hitView = [super hitTest:point withEvent:event];
+    if (hitView == self && !showMenu) {
+        return nil; // تمرير اللمس لببجي
+    }
+    return hitView;
+}
+
+// دالة الإخفاء والإظهار بثلاث أصابع
+- (void)toggleMenu {
+    showMenu = !showMenu;
+}
+
+// ==========================================
+// [ 4. محرك الرسم ]
+// ==========================================
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
 - (void)drawInMTKView:(MTKView *)view {
     if (!showMenu && !radarBox) return;
 
     ImGuiIO& io = ImGui::GetIO();
-    // أخذ أبعاد النافذة الحالية دائماً
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
 
     MTLRenderPassDescriptor *desc = view.currentRenderPassDescriptor;
@@ -252,7 +164,16 @@ static MTKView *g_MTKView = nil;
     ImGui_ImplMetal_NewFrame(desc);
     ImGui::NewFrame();
 
-    ShowUI();
+    if (showMenu) ShowUI();
+    
+    // المربع التجريبي للرادار
+    if (radarBox) {
+        ImDrawList* draw = ImGui::GetBackgroundDrawList();
+        float cx = io.DisplaySize.x / 2.0f;
+        float cy = io.DisplaySize.y / 2.0f;
+        draw->AddRect(ImVec2(cx - 50, cy - 100), ImVec2(cx + 50, cy + 100), IM_COL32(255,0,0,255), 0.0f, 0, 3.0f);
+        draw->AddText(ImVec2(cx - 30, cy - 120), IM_COL32(0,255,0,255), "Enemy (Test)");
+    }
 
     ImGui::Render();
     id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
@@ -264,50 +185,29 @@ static MTKView *g_MTKView = nil;
 @end
 
 // ==========================================
-// [ 7. محرك الهوك (إجبار الشاشة بالعرض Landscape) ]
+// [ 5. التشغيل الذكي (مسروق من مشروع Dolphins) ]
 // ==========================================
-%hook UIWindow
-- (void)makeKeyAndVisible {
-    %orig;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+static void didFinishLaunching(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef info) {
+    // ننتظر 4 ثواني حتى تفتح اللعبة وتستقر شاشتها
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        
+        UIWindow *mainWindow = [UIApplication sharedApplication].keyWindow;
+        if (!mainWindow) mainWindow = [[UIApplication sharedApplication].windows firstObject];
+        
+        if (mainWindow) {
+            WessamView *overlay = [[WessamView alloc] initWithFrame:mainWindow.bounds];
+            overlay.layer.zPosition = 99999;
+            [mainWindow addSubview:overlay];
             
-            // حساب العرض والطول الحقيقي للعبة بالعرض غصباً عن قراءات النظام
-            CGFloat w = MAX([UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
-            CGFloat h = MIN([UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
-            
-            WessamOverlay *overlay = [[WessamOverlay alloc] initWithFrame:CGRectMake(0, 0, w, h)];
-            
-            // التمدد مع الشاشة في حال حدوث أي دوران
-            overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            g_MTKView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            
-            [self addSubview:overlay];
-        });
+            // إضافة حساس أبل الأصلي للإخفاء بـ 3 أصابع
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:overlay action:@selector(toggleMenu)];
+            tap.numberOfTouchesRequired = 3;
+            [mainWindow addGestureRecognizer:tap];
+        }
     });
 }
 
-- (void)sendEvent:(UIEvent *)event {
-    if (imguiInitialized && g_MTKView) {
-        ImGuiIO& io = ImGui::GetIO();
-        UITouch *touch = [[event allTouches] anyObject];
-        
-        if (touch) {
-            // أخذ الإحداثيات من g_MTKView مباشرة حتى ما يصير أي انحراف باللمس
-            CGPoint loc = [touch locationInView:g_MTKView];
-            io.MousePos = ImVec2(loc.x, loc.y);
-            
-            if (touch.phase == UITouchPhaseBegan) io.MouseDown[0] = true;
-            else if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) io.MouseDown[0] = false;
-        }
-    }
-    
-    UITouch *touch3 = [[event allTouches] anyObject];
-    if ([[event allTouches] count] == 3 && touch3 && touch3.phase == UITouchPhaseBegan) {
-        showMenu = !showMenu;
-    }
-
-    %orig;
+// دالة البدء التلقائي (بدون هوك)
+__attribute__((constructor)) static void initialize() {
+    CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL, &didFinishLaunching, (CFStringRef)UIApplicationDidFinishLaunchingNotification, NULL, CFNotificationSuspensionBehaviorDrop);
 }
-%end
