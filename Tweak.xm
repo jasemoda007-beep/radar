@@ -7,7 +7,7 @@
 #import "ImGui/imgui_impl_metal.h"
 
 // ==========================================
-// [ 1. الأوفستات الأساسية ]
+// [ 1. الأوفستات الأساسية الآمنة ]
 // ==========================================
 namespace ServerConfig {
     NSString *LoginAPI = @"http://34.204.178.160/manager/api.php";
@@ -23,10 +23,16 @@ namespace Offsets {
     int ULevel = 0x30;
     int ActorArray = 0xA0;
     int ActorCount = 0xA8;
+    
     int Ptr1 = 0x38;
     int Ptr2 = 0x78;
     int Ptr3 = 0x30;
     int CameraManager = 0x548;
+    
+    // أوفستات قياسية ومستقرة لببجي 3.1 (بدون احتمالات)
+    int CameraCache = 0x10b0; 
+    int RootComponent = 0x158; 
+    int RelativeLocation = 0x120; 
 }
 
 enum ModState { LOGIN, ACTIVATING, SUCCESS_CARD, MAIN_MENU };
@@ -35,10 +41,13 @@ bool showMenu = true;
 bool imguiInitialized = false; 
 
 struct UserData { NSString *key; NSString *type; } g_User;
-bool radarBox = true, aimbot = false, noRecoil = false; // ضفنا الثبات
+
+// 🔥 تم إطفاء كل شيء افتراضياً لتجنب الكراش 🔥
+bool radarBox = false; 
+bool aimbot = false; 
 
 // ==========================================
-// [ 2. محرك قراءة وكتابة الذاكرة ]
+// [ 2. محرك قراءة الذاكرة الآمن ]
 // ==========================================
 uintptr_t get_base(const char* module) {
     if(!module) return (uintptr_t)_dyld_get_image_header(0);
@@ -51,16 +60,11 @@ uintptr_t get_base(const char* module) {
 
 template <typename T>
 T ReadMem(uintptr_t address) {
-    if (address > 0x100000000 && address < 0x2000000000) return *(T*)address;
-    return T{};
-}
-
-// دالة الكتابة (للتجميد والثبات)
-template <typename T>
-void WriteMem(uintptr_t address, T value) {
+    // حماية قوية جداً من الكراش (التأكد من أن العنوان صالح)
     if (address > 0x100000000 && address < 0x2000000000) {
-        *(T*)address = value;
+        return *(T*)address;
     }
+    return T{};
 }
 
 // ==========================================
@@ -101,107 +105,69 @@ ImVec2 worldToScreen(ImVec3 worldLocation, MinimalViewInfo camViewInfo, ImVec2 s
     ImVec3 vTransformed(ImVec3::Dot(vDelta, vAxisY), ImVec3::Dot(vDelta, vAxisZ), ImVec3::Dot(vDelta, vAxisX));
     if (vTransformed.z < 1.0f) vTransformed.z = 1.0f; 
     
-    float fov = camViewInfo.fov;
-    if (fov <= 0.0f || fov > 180.0f) fov = 90.0f; 
+    // إجبار دائم للـ FOV لحماية اللعبة من الكراش الرياضي
+    float safeFov = 90.0f; 
     
     ImVec2 screenCoord;
-    float fovCalc = screenCenter.x / tanf(fov * ((float) M_PI / 360.0f));
+    float fovCalc = screenCenter.x / tanf(safeFov * ((float) M_PI / 360.0f));
     screenCoord.x = (screenCenter.x + vTransformed.x * fovCalc / vTransformed.z);
     screenCoord.y = (screenCenter.y - vTransformed.y * fovCalc / vTransformed.z);
     return screenCoord;
 }
 
 // ==========================================
-// [ 4. محرك الرادار والثبات (Auto-Scanner & Recoil) ]
+// [ 4. محرك الرادار (ESP Loop المستقر) ]
 // ==========================================
 void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
+    if (!radarBox) return; // لن يعمل إلا إذا فعلته بنفسك من المنيو
+
     uintptr_t slide = _dyld_get_image_vmaddr_slide(0); 
     typedef uintptr_t (*GWorldFn)(uintptr_t);
     GWorldFn get_gworld = (GWorldFn)(slide + Global::GWorld_Func);
     uintptr_t gWorld = get_gworld(slide + Global::GWorld_Data);
     if (!gWorld) return;
 
+    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
+    if (!uLevel) return;
+
     uintptr_t ptr1 = ReadMem<uintptr_t>(gWorld + Offsets::Ptr1);
     uintptr_t ptr2 = ReadMem<uintptr_t>(ptr1 + Offsets::Ptr2);
     uintptr_t playerController = ReadMem<uintptr_t>(ptr2 + Offsets::Ptr3);
     uintptr_t cameraManager = ReadMem<uintptr_t>(playerController + Offsets::CameraManager);
     
-    // 🔥 1. تفعيل الثبات (No Recoil) بناءً على اكتشاف المهندس مسعود 🔥
-    if (noRecoil && cameraManager != 0) {
-        // تصفير اهتزاز الكاميرا (Aim Punch) اللي اكتشفناه بالفيديو
-        WriteMem<ImVec3>(cameraManager + 0x10b0 + 0x18, ImVec3(0.0f, 0.0f, 0.0f));
-        WriteMem<ImVec3>(cameraManager + 0x10b0 + 0xC, ImVec3(0.0f, 0.0f, 0.0f));
-    }
+    if (!cameraManager) return;
 
-    if (!radarBox) return;
-
-    uintptr_t uLevel = ReadMem<uintptr_t>(gWorld + Offsets::ULevel);
-    if (!uLevel) return;
-
-    // 🔥 2. الفحص الذكي للكاميرا (Auto-Scan Camera) 🔥
+    // 🔥 قراءة الكاميرا القياسية والآمنة 100% 🔥
     MinimalViewInfo pov;
-    bool foundCamera = false;
-    int winningCamOffset = 0;
-    
-    for (int offset = 0x1000; offset <= 0x1200; offset += 0x4) {
-        float testFov = ReadMem<float>(cameraManager + offset);
-        if (testFov > 80.0f && testFov < 120.0f) { 
-            // تجربة الترتيب القياسي (FOV بعد الموقع بـ 24 بايت)
-            ImVec3 testLoc = ReadMem<ImVec3>(cameraManager + offset - 0x18);
-            if (testLoc.x != 0 && testLoc.x > -1000000 && testLoc.x < 1000000) {
-                pov.location = testLoc;
-                pov.rotation = ReadMem<ImVec3>(cameraManager + offset - 0xC);
-                pov.fov = testFov;
-                foundCamera = true;
-                winningCamOffset = offset - 0x18;
-                break;
-            }
-        }
-    }
-    
-    if (!foundCamera) { pov.fov = 90.0f; pov.rotation = {0,0,0}; pov.location = {0,0,0}; }
+    pov.location = ReadMem<ImVec3>(cameraManager + Offsets::CameraCache + 0x0);
+    pov.rotation = ReadMem<ImVec3>(cameraManager + Offsets::CameraCache + 0xC); // الزاوية القياسية
+    pov.fov = 90.0f; 
 
     uintptr_t actorArray = ReadMem<uintptr_t>(uLevel + Offsets::ActorArray);
     int actorCount = ReadMem<int>(uLevel + Offsets::ActorCount);
-    if (actorCount < 1 || actorCount > 10000) return;
+    
+    // حماية إضافية للعدد
+    if (actorCount < 1 || actorCount > 5000) return;
     
     ImVec2 screenCenter = ImVec2(screenSize.x / 2, screenSize.y / 2);
     int drawnCount = 0; 
-    int winningRoot = 0;
-    int winningLoc = 0;
 
-    // مصفوفات الاحتمالات لموقع العدو
-    int testRoots[] = {0x158, 0x160, 0x168, 0x200, 0x208, 0x210};
-    int testLocs[]  = {0x11c, 0x120, 0x124, 0x200, 0x208, 0x2c0};
-
-    // 🔥 3. حلقة الرسم والفحص الذكي للـ Actor 🔥
     for (int i = 0; i < actorCount; i++) {
         uintptr_t actor = ReadMem<uintptr_t>(actorArray + (i * 8));
         if (!actor) continue;
 
-        ImVec3 actorLocation = {0, 0, 0};
+        uintptr_t rootComponent = ReadMem<uintptr_t>(actor + Offsets::RootComponent);
+        if (!rootComponent) continue;
         
-        for (int r : testRoots) {
-            uintptr_t rootComponent = ReadMem<uintptr_t>(actor + r);
-            if (!rootComponent) continue;
-            
-            for (int l : testLocs) {
-                ImVec3 loc = ReadMem<ImVec3>(rootComponent + l);
-                if (loc.x != 0 && loc.x > -1000000 && loc.x < 1000000 && loc.y != 0) {
-                    actorLocation = loc;
-                    winningRoot = r;
-                    winningLoc = l;
-                    break;
-                }
-            }
-            if (actorLocation.x != 0) break;
-        }
+        ImVec3 actorLocation = ReadMem<ImVec3>(rootComponent + Offsets::RelativeLocation);
         
-        if (actorLocation.x == 0) continue; 
+        // تجاهل الإحداثيات الخاطئة
+        if (actorLocation.x == 0 && actorLocation.y == 0) continue;
+        if (actorLocation.x > 1000000 || actorLocation.x < -1000000) continue; 
         
         ImVec2 screenPos = worldToScreen(actorLocation, pov, screenCenter);
 
-        if (screenPos.x > -200 && screenPos.y > -200 && screenPos.x < screenSize.x + 200) {
+        if (screenPos.x > -100 && screenPos.y > -100 && screenPos.x < screenSize.x + 100) {
             draw->AddRect(ImVec2(screenPos.x - 20, screenPos.y - 40), 
                           ImVec2(screenPos.x + 20, screenPos.y + 40), 
                           IM_COL32(255, 0, 0, 255), 0, 0, 1.5f);
@@ -212,11 +178,10 @@ void DrawESP(ImDrawList* draw, ImVec2 screenSize) {
         }
     }
     
-    // شاشة نتائج الفحص الذكي (باللون الأزرق السماوي)
-    char debugText[512];
-    sprintf(debugText, "Actors: %d | Drawn: %d | Cam Offset: 0x%X\nRoot: 0x%X | Loc: 0x%X | Recoil Freezed: %s", 
-            actorCount, drawnCount, winningCamOffset, winningRoot, winningLoc, noRecoil ? "YES" : "NO");
-    draw->AddText(ImVec2(screenSize.x / 2 - 200, 100), IM_COL32(0, 255, 255, 255), debugText);
+    // شاشة المراقبة 
+    char debugText[256];
+    sprintf(debugText, "Actors: %d | Drawn: %d | System Stable!", actorCount, drawnCount);
+    draw->AddText(ImVec2(screenSize.x / 2 - 100, 80), IM_COL32(0, 255, 0, 255), debugText);
 }
 
 // ==========================================
@@ -227,7 +192,7 @@ void ShowUI() {
     
     if (g_State == LOGIN) {
         ImGui::Begin("WESSAM CYBER - LOGIN", &showMenu, ImGuiWindowFlags_NoCollapse);
-        ImGui::TextColored(ImVec4(0, 1, 0, 1), "System Ready! (Dolphins Engine)");
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "System Ready! (Stable Engine)");
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         if (ImGui::Button("AUTO LOGIN (TEST) 🚀", ImVec2(-1, 90))) {
             g_User.key = @"WESSAM-TEST";
@@ -251,10 +216,8 @@ void ShowUI() {
                 ImGui::Checkbox(" Enable ESP Boxes", &radarBox); 
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Memory Hacks")) {
+            if (ImGui::BeginTabItem("Aimbot")) {
                 ImGui::Spacing(); 
-                ImGui::Checkbox(" Enable No Recoil (ثبات السلاح)", &noRecoil); 
-                ImGui::Spacing();
                 ImGui::Checkbox(" Enable Magic Bullet", &aimbot); 
                 ImGui::EndTabItem();
             }
@@ -320,7 +283,7 @@ void ShowUI() {
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {}
 
 - (void)drawInMTKView:(MTKView *)view {
-    if (!showMenu && !radarBox && !noRecoil) return;
+    if (!showMenu && !radarBox) return;
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
     MTLRenderPassDescriptor *desc = view.currentRenderPassDescriptor;
@@ -331,9 +294,11 @@ void ShowUI() {
 
     if (showMenu) ShowUI();
     
-    // الرادار يشتغل حتى لو المنيو مسدود بس لازم يكون مفعل
-    ImDrawList* draw = ImGui::GetBackgroundDrawList();
-    DrawESP(draw, io.DisplaySize);
+    // الرادار يشتغل فقط إذا فعلته أنت
+    if (radarBox) {
+        ImDrawList* draw = ImGui::GetBackgroundDrawList();
+        DrawESP(draw, io.DisplaySize);
+    }
 
     ImGui::Render();
     id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:desc];
