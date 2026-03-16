@@ -1,0 +1,50 @@
+name: Build Wessam VIP Tweak
+
+# يشتغل السيرفر تلقائياً أول ما ترفع تعديل جديد للكود
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    # نطلب من جيت هاب يوفر لنا جهاز ماك بوك عليه أحدث إكس كود
+    runs-on: macos-latest
+
+    steps:
+    # 1. نسخ ملفات مشروعك (الكود مالتك)
+    - name: Checkout Project Code
+      uses: actions/checkout@v3
+
+    # 2. تحميل Theos (محرك البناء) على سيرفر الماك
+    - name: Setup Theos
+      uses: actions/checkout@v3
+      with:
+        repository: theos/theos
+        path: theos
+        submodules: true
+
+    # 3. تعريف مسار Theos للسيرفر
+    - name: Set THEOS Environment Variable
+      run: echo "THEOS=$GITHUB_WORKSPACE/theos" >> $GITHUB_ENV
+
+    # 4. تحميل مكاتب أبل (iOS SDKs) حتى ما يطلب أخطاء
+    - name: Setup iOS SDKs
+      uses: actions/checkout@v3
+      with:
+        repository: theos/sdks
+        path: theos/sdks
+
+    # 5. أمر البناء (هنا يصير السحر والإكس كود يشتغل)
+    - name: Build Tweak (Make Package)
+      run: |
+        make package FINALPACKAGE=1
+
+    # 6. سحب الأداة الجاهزة (.deb) ورفعها الك حتى تحملها
+    - name: Upload Compiled Tweak
+      uses: actions/upload-artifact@v3
+      with:
+        name: Wessam-VIP-Hack
+        path: packages/*.deb
+        
